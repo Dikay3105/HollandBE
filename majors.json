@@ -1,0 +1,1553 @@
+[
+    {
+        "name": "Thiết kế công nghiệp",
+        "description": "Thực hành kỹ thuật tốt, sáng tạo trong giải quyết vấn đề, phù hợp với công ty kiến trúc, kỹ thuật cao.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Kiến trúc kỹ thuật",
+        "description": "Thực hành kỹ thuật tốt, kết hợp tư duy khoa học và thẩm mỹ, phù hợp với công ty kiến trúc.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Nhiếp ảnh",
+        "description": "Sáng tạo trong giải quyết vấn đề, kết hợp tư duy thẩm mỹ, phù hợp với dự án kỹ thuật nghệ thuật.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Quy hoạch đô thị",
+        "description": "Thực hành kỹ thuật tốt, sáng tạo, phù hợp với công ty kiến trúc và quy hoạch.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Công nghệ Sinh học",
+        "description": "Kết hợp tư duy khoa học, sáng tạo, phù hợp với công ty kỹ thuật cao và sinh học.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Kỹ thuật cơ khí",
+        "description": "Thực hành kỹ thuật tốt, sáng tạo, phù hợp với cơ khí và kỹ thuật cao.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Điện tử",
+        "description": "Thực hành kỹ thuật tốt, sáng tạo, phù hợp với công ty kỹ thuật cao.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Mỹ thuật công nghiệp",
+        "description": "Kết hợp tư duy khoa học và thẩm mỹ, sáng tạo, phù hợp với dự án kỹ thuật nghệ thuật.",
+        "examBlocks": [
+            "V00",
+            "H01",
+            "A00",
+            "A01",
+            "B00",
+            "D07",
+            "H00"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "A"
+        ]
+    },
+    {
+        "name": "Kỹ thuật y sinh",
+        "description": "Phân tích khoa học tốt, quan tâm sức khỏe cộng đồng, phù hợp với bệnh viện và viện nghiên cứu.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Bác sĩ",
+        "description": "Kiên nhẫn, tỉ mỉ, quan tâm sức khỏe cộng đồng, phù hợp với bệnh viện và y tế cộng đồng.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Thú y",
+        "description": "Phân tích khoa học tốt, quan tâm sức khỏe động vật, phù hợp với viện nghiên cứu và y tế.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Điều dưỡng",
+        "description": "Kiên nhẫn, tỉ mỉ, quan tâm sức khỏe cộng đồng, phù hợp với bệnh viện và trường học.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Y tế cộng đồng",
+        "description": "Phân tích khoa học tốt, quan tâm sức khỏe cộng đồng, phù hợp với tổ chức y tế.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Công tác xã hội",
+        "description": "Quan tâm sức khỏe cộng đồng, kiên nhẫn, phù hợp với tổ chức y tế và trường học.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Công nghệ môi trường",
+        "description": "Phân tích khoa học tốt, quan tâm môi trường, phù hợp với viện nghiên cứu và tổ chức y tế.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Giáo viên",
+        "description": "Kiên nhẫn, quan tâm cộng đồng, phù hợp với trường học và tổ chức giáo dục.",
+        "examBlocks": [
+            "B00",
+            "A00",
+            "A01",
+            "C08",
+            "D07",
+            "D08"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "S"
+        ]
+    },
+    {
+        "name": "Logistics",
+        "description": "Giỏi thực hành, tư duy quản lý, phù hợp với doanh nghiệp công nghệ và startup.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "D07",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "E"
+        ]
+    },
+    {
+        "name": "Quản lí vận hành bay",
+        "description": "Tư duy quản lý, năng động, phù hợp với doanh nghiệp hàng không và logistics.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "D07",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "E"
+        ]
+    },
+    {
+        "name": "Xây dựng",
+        "description": "Giỏi thực hành, năng động, phù hợp với doanh nghiệp xây dựng và công nghệ.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "D07",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "E"
+        ]
+    },
+    {
+        "name": "Công nghệ thông tin",
+        "description": "Giỏi thực hành, tư duy quản lý, phù hợp với doanh nghiệp công nghệ và startup.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "D07",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "E"
+        ]
+    },
+    {
+        "name": "An ninh mạng",
+        "description": "Giỏi thực hành, tư duy quản lý, phù hợp với doanh nghiệp công nghệ và startup.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "D07",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "E"
+        ]
+    },
+    {
+        "name": "Kỹ thuật điện – tự động hóa",
+        "description": "Cẩn thận, phân tích logic, phù hợp với nhà máy và khu công nghiệp.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "D07",
+            "D08",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "C"
+        ]
+    },
+    {
+        "name": "Robot",
+        "description": "Phân tích logic, làm việc theo quy trình, phù hợp với nhà máy và công nghệ.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "D07",
+            "D08",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "C"
+        ]
+    },
+    {
+        "name": "Xử lí dữ liệu",
+        "description": "Cẩn thận, phân tích logic, phù hợp với trung tâm phân tích và công nghệ.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "D07",
+            "D08",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "C"
+        ]
+    },
+    {
+        "name": "Trí tuệ nhân tạo",
+        "description": "Phân tích logic, tổ chức tốt, phù hợp với trung tâm phân tích và công nghệ.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "D07",
+            "D08",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "C"
+        ]
+    },
+    {
+        "name": "Kế toán",
+        "description": "Cẩn thận, làm việc theo quy trình, phù hợp với cơ quan quản lý và ngân hàng.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "D07",
+            "D08",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "C"
+        ]
+    },
+    {
+        "name": "Ngân hàng",
+        "description": "Cẩn thận, tổ chức tốt, phù hợp với ngân hàng và cơ quan quản lý.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "D07",
+            "D08",
+            "B00",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "I",
+            "C"
+        ]
+    },
+    {
+        "name": "Thiết kế sân khấu & kỹ thuật biểu diễn",
+        "description": "Khéo tay, sáng tạo, phù hợp với công ty thiết kế và nghệ thuật.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Thiết kế sự kiện",
+        "description": "Sáng tạo, truyền cảm hứng, phù hợp với công ty truyền thông và sự kiện.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Mỹ thuật ứng dụng",
+        "description": "Khéo tay, sáng tạo, phù hợp với công ty thiết kế và giáo dục.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Thiết kế nội thất",
+        "description": "Sáng tạo, thân thiện, phù hợp với công ty kiến trúc và thiết kế.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Thiết kế đồ họa ứng dụng",
+        "description": "Sáng tạo, truyền cảm hứng, phù hợp với công ty thiết kế và truyền thông.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Thiết kế thời trang",
+        "description": "Khéo tay, sáng tạo, phù hợp với công ty thiết kế và nghệ thuật.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Hướng dẫn viên du lịch",
+        "description": "Thân thiện, truyền cảm hứng, phù hợp với công ty du lịch và giáo dục.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Sư phạm",
+        "description": "Thân thiện, truyền cảm hứng, phù hợp với trường học và giáo dục.",
+        "examBlocks": [
+            "H00",
+            "V00",
+            "V01",
+            "A00",
+            "A01",
+            "D09",
+            "D01",
+            "C00",
+            "C03"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Truyền thông đa phương tiện",
+        "description": "Thẩm mỹ tốt, sáng tạo, phù hợp với công ty thiết kế và quảng cáo.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "H00",
+            "H01",
+            "V00",
+            "D07"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "E"
+        ]
+    },
+    {
+        "name": "Marketing",
+        "description": "Thẩm mỹ tốt, sáng tạo, phù hợp với công ty quảng cáo và truyền thông.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "H00",
+            "H01",
+            "V00",
+            "D07"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "E"
+        ]
+    },
+    {
+        "name": "Kiến trúc cảnh quan",
+        "description": "Thực tế, sáng tạo, phù hợp với công ty thiết kế kỹ thuật và mỹ thuật.",
+        "examBlocks": [
+            "V00",
+            "A00",
+            "H00",
+            "V01",
+            "A01",
+            "C00",
+            "C03",
+            "D01",
+            "D09"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "C"
+        ]
+    },
+    {
+        "name": "Thiết kế đô thị",
+        "description": "Thực tế, sáng tạo, phù hợp với công ty kiến trúc và quy hoạch.",
+        "examBlocks": [
+            "V00",
+            "A00",
+            "H00",
+            "V01",
+            "A01",
+            "C00",
+            "C03",
+            "D01",
+            "D09"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "C"
+        ]
+    },
+    {
+        "name": "Công nghệ dệt may",
+        "description": "Thực tế, sáng tạo, phù hợp với công ty thiết kế và kỹ thuật.",
+        "examBlocks": [
+            "V00",
+            "A00",
+            "H00",
+            "V01",
+            "A01",
+            "C00",
+            "C03",
+            "D01",
+            "D09"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "C"
+        ]
+    },
+    {
+        "name": "Điện ảnh",
+        "description": "Sáng tạo, tổ chức tốt, phù hợp với hãng phim và truyền thông.",
+        "examBlocks": [
+            "V00",
+            "A00",
+            "H00",
+            "V01",
+            "A01",
+            "C00",
+            "C03",
+            "D01",
+            "D09"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "C"
+        ]
+    },
+    {
+        "name": "Thư viện",
+        "description": "Thực tế, tổ chức tốt, phù hợp với thư viện và cơ quan văn hóa.",
+        "examBlocks": [
+            "V00",
+            "A00",
+            "H00",
+            "V01",
+            "A01",
+            "C00",
+            "C03",
+            "D01",
+            "D09"
+        ],
+        "hollandTypes": [
+            "R",
+            "A",
+            "C"
+        ]
+    },
+    {
+        "name": "Huấn luyện viên thể thao",
+        "description": "Thực tế, tinh thần cộng đồng, phù hợp với dịch vụ và trường học.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "C00",
+            "D01",
+            "C14",
+            "D17"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Quản trị du lịch lữ hành",
+        "description": "Thực tế, giỏi làm việc nhóm, phù hợp với doanh nghiệp du lịch.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "C00",
+            "D01",
+            "C14",
+            "D17"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Quản trị nhà hàng khách sạn",
+        "description": "Thực tế, tinh thần cộng đồng, phù hợp với dịch vụ và khách sạn.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "C00",
+            "D01",
+            "C14",
+            "D17"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Quản lí sự kiện",
+        "description": "Thực tế, giỏi làm việc nhóm, phù hợp với doanh nghiệp sự kiện.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "C00",
+            "D01",
+            "C14",
+            "D17"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Cảnh sát giao thông",
+        "description": "Thực tế, trách nhiệm, phù hợp với cơ quan hành chính.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "C00",
+            "D01",
+            "C14",
+            "D17"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Tài chính",
+        "description": "Thực tế, trách nhiệm, phù hợp với doanh nghiệp và ngân hàng.",
+        "examBlocks": [
+            "A00",
+            "A01",
+            "C00",
+            "D01",
+            "C14",
+            "D17"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Hộ sinh",
+        "description": "Nhân văn, giao tiếp tốt, phù hợp với cơ sở y tế và trường học.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D07",
+            "C14",
+            "D01",
+            "A00",
+            "A01"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Kỹ thuật Y học",
+        "description": "Nhân văn, nghiên cứu tốt, phù hợp với viện nghiên cứu và y tế.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D07",
+            "C14",
+            "D01",
+            "A00",
+            "A01"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Giáo dục thể chất",
+        "description": "Nhân văn, giao tiếp tốt, phù hợp với trường học và tổ chức xã hội.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D07",
+            "C14",
+            "D01",
+            "A00",
+            "A01"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Công nghệ thực phẩm",
+        "description": "Nhân văn, nghiên cứu tốt, phù hợp với viện nghiên cứu và tổ chức xã hội.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D07",
+            "C14",
+            "D01",
+            "A00",
+            "A01"
+        ],
+        "hollandTypes": [
+            "R",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Quản lý nhà máy",
+        "description": "Thực tế, giỏi tổ chức, phù hợp với doanh nghiệp sản xuất và logistics.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "D07",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Chuỗi cung ứng",
+        "description": "Thực tế, giỏi quản lý quy trình, phù hợp với doanh nghiệp logistics.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "D07",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Tiếp viên hàng không",
+        "description": "Thực tế, kỷ luật, phù hợp với doanh nghiệp hàng không.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "D07",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Phi công",
+        "description": "Thực tế, kỷ luật, phù hợp với doanh nghiệp hàng không.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "D07",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Xuất nhập khẩu",
+        "description": "Thực tế, giỏi quản lý quy trình, phù hợp với doanh nghiệp logistics.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "D07",
+            "C01"
+        ],
+        "hollandTypes": [
+            "R",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Tâm lý học",
+        "description": "Tư duy phân tích, sáng tạo, phù hợp với viện nghiên cứu và trường học.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D01",
+            "A00",
+            "C14",
+            "A01",
+            "D14",
+            "D15",
+            "H00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Giáo dục đặc biệt",
+        "description": "Tư duy phân tích, sáng tạo, phù hợp với trường học và viện nghiên cứu.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D01",
+            "A00",
+            "C14",
+            "A01",
+            "D14",
+            "D15",
+            "H00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Giáo dục mầm non",
+        "description": "Tư duy phân tích, sáng tạo, phù hợp với trường học và giáo dục.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D01",
+            "A00",
+            "C14",
+            "A01",
+            "D14",
+            "D15",
+            "H00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Báo chí",
+        "description": "Tư duy phân tích, sáng tạo, phù hợp với công ty truyền thông và tòa soạn.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D01",
+            "A00",
+            "C14",
+            "A01",
+            "D14",
+            "D15",
+            "H00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Truyền thông",
+        "description": "Tư duy phân tích, sáng tạo, phù hợp với công ty truyền thông và sự kiện.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D01",
+            "A00",
+            "C14",
+            "A01",
+            "D14",
+            "D15",
+            "H00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "S"
+        ]
+    },
+    {
+        "name": "Quản trị sự kiện",
+        "description": "Sáng tạo, giao tiếp tốt, phù hợp với doanh nghiệp sáng tạo và sự kiện.",
+        "examBlocks": [
+            "D01",
+            "H01",
+            "D14",
+            "H00",
+            "V00",
+            "R00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "E"
+        ]
+    },
+    {
+        "name": "Quan hệ công chúng",
+        "description": "Sáng tạo, giao tiếp tốt, phù hợp với doanh nghiệp truyền thông và sự kiện.",
+        "examBlocks": [
+            "D01",
+            "H01",
+            "D14",
+            "H00",
+            "V00",
+            "R00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "E"
+        ]
+    },
+    {
+        "name": "Thiết kế games",
+        "description": "Sáng tạo, giao tiếp tốt, phù hợp với doanh nghiệp sáng tạo.",
+        "examBlocks": [
+            "D01",
+            "H01",
+            "D14",
+            "H00",
+            "V00",
+            "R00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "E"
+        ]
+    },
+    {
+        "name": "Biên tập viên",
+        "description": "Phân tích tốt, sáng tạo, phù hợp với công ty truyền thông và dữ liệu.",
+        "examBlocks": [
+            "H01",
+            "D01",
+            "A00",
+            "C00",
+            "H00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "C"
+        ]
+    },
+    {
+        "name": "Thống kê",
+        "description": "Phân tích tốt, tỉ mỉ, phù hợp với phòng nghiên cứu và dữ liệu.",
+        "examBlocks": [
+            "H01",
+            "D01",
+            "A00",
+            "C00",
+            "H00"
+        ],
+        "hollandTypes": [
+            "I",
+            "A",
+            "C"
+        ]
+    },
+    {
+        "name": "Quản trị nhân lực",
+        "description": "Phân tích logic, giỏi giao tiếp, phù hợp với doanh nghiệp và trường học.",
+        "examBlocks": [
+            "D01",
+            "C00",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "I",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Kinh tế - Chính sách công",
+        "description": "Phân tích logic, thuyết phục tốt, phù hợp với viện nghiên cứu và doanh nghiệp.",
+        "examBlocks": [
+            "D01",
+            "C00",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "I",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Quản lý giáo dục",
+        "description": "Phân tích logic, tổ chức tốt, phù hợp với trường học và viện nghiên cứu.",
+        "examBlocks": [
+            "D01",
+            "C00",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "I",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Luật",
+        "description": "Phân tích logic, thuyết phục tốt, phù hợp với doanh nghiệp và cơ quan nhà nước.",
+        "examBlocks": [
+            "D01",
+            "C00",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "I",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Quan hệ quốc tế",
+        "description": "Phân tích logic, giỏi giao tiếp, phù hợp với tổ chức quốc tế và truyền thông.",
+        "examBlocks": [
+            "D01",
+            "C00",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "I",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Thư ký văn phòng",
+        "description": "Phân tích khoa học, làm việc có hệ thống, phù hợp với cơ quan hành chính.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D01",
+            "A00",
+            "C14"
+        ],
+        "hollandTypes": [
+            "I",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Quản lí nhà nước",
+        "description": "Làm việc có hệ thống, quan tâm con người, phù hợp với cơ quan hành chính.",
+        "examBlocks": [
+            "B00",
+            "C00",
+            "D01",
+            "A00",
+            "C14"
+        ],
+        "hollandTypes": [
+            "I",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Kinh tế",
+        "description": "Phân tích logic, quyết đoán, phù hợp với doanh nghiệp và ngân hàng.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "C00",
+            "D07"
+        ],
+        "hollandTypes": [
+            "I",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Kiểm toán",
+        "description": "Phân tích logic, làm việc theo quy trình, phù hợp với doanh nghiệp và ngân hàng.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "C00",
+            "D07"
+        ],
+        "hollandTypes": [
+            "I",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Quản trị kinh doanh",
+        "description": "Phân tích logic, quản lý tốt, phù hợp với doanh nghiệp và tổ chức quốc tế.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "C00",
+            "D07"
+        ],
+        "hollandTypes": [
+            "I",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Quản lí công",
+        "description": "Phân tích logic, quản lý tốt, phù hợp với cơ quan nhà nước và doanh nghiệp.",
+        "examBlocks": [
+            "A00",
+            "D01",
+            "A01",
+            "C00",
+            "D07"
+        ],
+        "hollandTypes": [
+            "I",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Quảng cáo",
+        "description": "Giàu sáng tạo, giỏi giao tiếp, phù hợp với công ty truyền thông và quảng cáo.",
+        "examBlocks": [
+            "C00",
+            "D01",
+            "H00",
+            "V00",
+            "V01",
+            "H",
+            "R"
+        ],
+        "hollandTypes": [
+            "A",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Đạo diễn",
+        "description": "Giàu sáng tạo, truyền cảm hứng, phù hợp với sân khấu và nghệ thuật.",
+        "examBlocks": [
+            "C00",
+            "D01",
+            "H00",
+            "V00",
+            "V01",
+            "H",
+            "R"
+        ],
+        "hollandTypes": [
+            "A",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "MC",
+        "description": "Giỏi giao tiếp, linh hoạt, phù hợp với công ty truyền thông và sự kiện.",
+        "examBlocks": [
+            "C00",
+            "D01",
+            "H00",
+            "V00",
+            "V01",
+            "H",
+            "R"
+        ],
+        "hollandTypes": [
+            "A",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Biên kịch",
+        "description": "Giàu sáng tạo, truyền cảm hứng, phù hợp với sân khấu và truyền thông.",
+        "examBlocks": [
+            "C00",
+            "D01",
+            "H00",
+            "V00",
+            "V01",
+            "H",
+            "R"
+        ],
+        "hollandTypes": [
+            "A",
+            "S",
+            "E"
+        ]
+    },
+    {
+        "name": "Ngôn ngữ",
+        "description": "Sáng tạo, giao tiếp tốt, phù hợp với trường học và viện văn hóa.",
+        "examBlocks": [
+            "H00",
+            "C00",
+            "D01",
+            "D14",
+            "D15",
+            "A01",
+            "A00"
+        ],
+        "hollandTypes": [
+            "A",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Lưu trữ",
+        "description": "Sáng tạo, tổ chức tốt, phù hợp với thư viện và cơ quan văn hóa.",
+        "examBlocks": [
+            "H00",
+            "C00",
+            "D01",
+            "D14",
+            "D15",
+            "A01",
+            "A00"
+        ],
+        "hollandTypes": [
+            "A",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Quản trị văn phòng",
+        "description": "Sáng tạo, tổ chức tốt, phù hợp với cơ quan truyền thông và trường học.",
+        "examBlocks": [
+            "H00",
+            "C00",
+            "D01",
+            "D14",
+            "D15",
+            "A01",
+            "A00"
+        ],
+        "hollandTypes": [
+            "A",
+            "S",
+            "C"
+        ]
+    },
+    {
+        "name": "Quản trị nhân sự",
+        "description": "Giỏi giao tiếp, lãnh đạo tốt, phù hợp với giáo dục và công ty.",
+        "examBlocks": [
+            "C00",
+            "D01",
+            "D14",
+            "D15",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "S",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Chính trị học",
+        "description": "Giỏi giao tiếp, thuyết phục, phù hợp với tổ chức cộng đồng và truyền thông.",
+        "examBlocks": [
+            "C00",
+            "D01",
+            "D14",
+            "D15",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "S",
+            "E",
+            "C"
+        ]
+    },
+    {
+        "name": "Hành chính",
+        "description": "Giỏi giao tiếp, tổ chức tốt, phù hợp với cơ quan hành chính và giáo dục.",
+        "examBlocks": [
+            "C00",
+            "D01",
+            "D14",
+            "D15",
+            "A00",
+            "A01",
+            "B00"
+        ],
+        "hollandTypes": [
+            "S",
+            "E",
+            "C"
+        ]
+    }
+]

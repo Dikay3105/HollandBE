@@ -1,0 +1,71 @@
+# ===============================
+# Node.js / Backend
+# ===============================
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# dotenv environment variables
+.env
+.env.*      # ví dụ .env.production, .env.development
+!.env.example   # giữ lại file mẫu
+
+# Build output
+dist/
+build/
+tmp/
+temp/
+.cache/
+.next/
+out/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Coverage directories
+coverage/
+.nyc_output/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Debugging files
+*.tgz
+
+# Optional lock files (tùy chọn, nếu bạn không muốn commit)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
