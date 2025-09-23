@@ -4,7 +4,7 @@ const Student = require('../models/Student');
 
 exports.submitResults = async (req, res) => {
     try {
-        const { personalInfo, selectedBlocks, hollandScores } = req.body;
+        const { personalInfo, selectedBlocks, hollandScores, scores } = req.body;
         const { name, class: studentClass, number } = personalInfo;
 
         // 1️⃣ Lấy 3–4 nhóm Holland cao nhất (có thể đồng điểm)
@@ -43,6 +43,7 @@ exports.submitResults = async (req, res) => {
                 $set: {
                     selectedBlocks,
                     hollandScores,
+                    scores,
                     recommendedMajors: majors,
                     createdAt: new Date() // cập nhật thời gian cho lần làm mới nhất
                 }

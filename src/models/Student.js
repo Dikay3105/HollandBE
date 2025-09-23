@@ -24,6 +24,13 @@ const studentSchema = new mongoose.Schema({
         E: Number,
         C: Number
     },
+    scores: [
+        {
+            subject: { type: String, required: true },      // Tên môn
+            currentScore: { type: Number, min: 0, max: 10 },// Điểm hiện tại
+            targetScore: { type: Number, min: 0, max: 10 }  // Điểm mong muốn
+        }
+    ],
     recommendedMajors: [
         {
             id: String,
