@@ -5,31 +5,27 @@ const Student = require('../models/Student');
 exports.submitResults = async (req, res) => {
     try {
         const { personalInfo, selectedBlocks, hollandScores } = req.body;
+        const { name, class: studentClass, number } = personalInfo;
 
-        // 1️⃣ Lấy 3–4 nhóm Holland cao nhất (nếu có đồng điểm)
-        const sorted = Object.entries(hollandScores)
-            .sort((a, b) => b[1] - a[1]);
-
-        const thirdScore = sorted[2][1]; // điểm của nhóm đứng thứ 3
+        // 1️⃣ Lấy 3–4 nhóm Holland cao nhất (có thể đồng điểm)
+        const sorted = Object.entries(hollandScores).sort((a, b) => b[1] - a[1]);
+        const thirdScore = sorted[2]?.[1] ?? 0; // phòng trường hợp thiếu dữ liệu
         const topGroups = sorted
             .filter(([_, score]) => score >= thirdScore)
             .map(([group]) => group);
 
         // 2️⃣ Chỉ chọn ngành có đủ TẤT CẢ các nhóm topGroups
-        //    -> major.hollandTypes phải chứa mọi nhóm trong topGroups
         const majors = await Major.find({
             examBlocks: { $in: selectedBlocks },
-            hollandTypes: { $all: topGroups } // << khác với $in
+            hollandTypes: { $all: topGroups }
         }).lean();
 
         // 3️⃣ Tạo thông điệp phản hồi
         let recommendationText;
         if (majors.length > 0) {
             const majorNames = majors.map(m => m.name).join(', ');
-
             recommendationText = [
                 `Ngành nghề bạn có thể lựa chọn: ${majorNames}.`,
-                `Đặc điểm của nhóm ngành nghề này: ${topGroups.join(', ')}.`,
                 'Để biến cơ hội thành hiện thực, hãy tiếp tục tập trung rèn luyện các môn thi đại học – chìa khóa giúp bạn tiến gần hơn đến mục tiêu.'
             ].join('\n');
         } else {
@@ -40,24 +36,28 @@ exports.submitResults = async (req, res) => {
             ].join(' ');
         }
 
-        // 4️⃣ Lưu thông tin student cùng kết quả
-        const newStudent = await Student.create({
-            name: personalInfo.name,
-            class: personalInfo.class,
-            class: personalInfo.class,
-            selectedBlocks,
-            hollandScores,
-            recommendedMajors: majors
-        });
+        // 4️⃣ Lưu/Update thông tin Student: nếu cùng name + class + number thì UPDATE, không tạo mới
+        const updatedStudent = await Student.findOneAndUpdate(
+            { name, class: studentClass, number },       // điều kiện trùng khớp
+            {
+                $set: {
+                    selectedBlocks,
+                    hollandScores,
+                    recommendedMajors: majors,
+                    createdAt: new Date() // cập nhật thời gian cho lần làm mới nhất
+                }
+            },
+            { new: true, upsert: true } // new: trả về document mới, upsert: không có thì tạo mới
+        );
 
         // 5️⃣ Trả kết quả
         res.json({
             success: true,
             message: 'Kết quả đã được xử lý',
             recommendedMajors: majors,
-            recommendationText
+            recommendationText,
+            student: updatedStudent
         });
-
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
