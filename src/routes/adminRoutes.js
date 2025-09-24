@@ -4,6 +4,9 @@ const ExamBlock = require('../models/ExamBlock');
 const Major = require('../models/Major');
 const Question = require('../models/Question');
 
+const { getStats } = require('../controllers/adminController');
+
+router.get('/stats', getStats);
 /* ======== Exam Block CRUD ======== */
 // Lấy tất cả khối thi
 router.get('/exam-blocks', async (_, res) => {
