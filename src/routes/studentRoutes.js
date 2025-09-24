@@ -1,8 +1,14 @@
+// src/routes/studentRoutes.js
 const express = require('express');
 const router = express.Router();
-const { createStudent, getStudents } = require('../controllers/studentController');
+const studentCtrl = require('../controllers/studentController');
 
-router.post('/', createStudent);
-router.get('/', getStudents);
+
+router.get('/search', studentCtrl.searchStudents);
+router.post('/', studentCtrl.createStudent);
+router.get('/', studentCtrl.getStudents);
+router.get('/:id', studentCtrl.getStudentById);
+router.put('/:id', studentCtrl.updateStudent);
+router.delete('/:id', studentCtrl.deleteStudent);
 
 module.exports = router;
