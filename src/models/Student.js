@@ -37,7 +37,7 @@ const studentSchema = new mongoose.Schema({
             name: String,
             description: String,
             examBlocks: [String],
-            hollandTypes: [String]
+            hollandGroups: [String]
         }
     ],
     createdAt: { type: Date, default: Date.now }

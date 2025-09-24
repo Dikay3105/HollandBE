@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Major = require('./src/models/Major');
 const Question = require('./src/models/Question');
 const questions = require('./questions.json');
-const majors = require('./majors.json');
+const majors = require('./majors2.json');
 
 
 (async () => {

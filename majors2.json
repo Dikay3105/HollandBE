@@ -1,0 +1,614 @@
+[
+    {
+        "name": "An ninh mạng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D01", "D07"],
+        "hollandGroups": ["RIE"]
+    },
+    {
+        "name": "Biên kịch",
+        "description": "",
+        "examBlocks": ["C00", "D01", "H00", "V00", "V01", "H", "R"],
+        "hollandGroups": ["ASE"]
+    },
+    {
+        "name": "Biên tập viên",
+        "description": "",
+        "examBlocks": ["A00", "C00", "D01", "H00", "H01"],
+        "hollandGroups": ["IAC"]
+    },
+    {
+        "name": "Báo chí",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D07", "D09", "D14", "D15", "H00", "H01"],
+        "hollandGroups": ["AEC", "IAS", "ISE", "SEC"]
+    },
+    {
+        "name": "Bác sĩ",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C08", "D07", "D08"],
+        "hollandGroups": ["RIS"]
+    },
+    {
+        "name": "CN thực phẩm",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D07"],
+        "hollandGroups": ["RSC"]
+    },
+    {
+        "name": "Chuỗi cung ứng",
+        "description": "",
+        "examBlocks": ["A00", "C01", "D01", "D07"],
+        "hollandGroups": ["REC"]
+    },
+    {
+        "name": "Chính trị học",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01", "D14", "D15"],
+        "hollandGroups": ["SEC"]
+    },
+    {
+        "name": "Công nghệ",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D01", "D07"],
+        "hollandGroups": ["RIE"]
+    },
+    {
+        "name": "Công nghệ Sinh học",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D07", "D08", "H00", "H01", "V00"],
+        "hollandGroups": ["RIA", "RIC"]
+    },
+    {
+        "name": "Công nghệ dệt may",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAC"]
+    },
+    {
+        "name": "Công nghệ môi trường",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C08", "D07", "D08"],
+        "hollandGroups": ["RIS"]
+    },
+    {
+        "name": "Công nghệ thông tin",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D01", "D07", "D08"],
+        "hollandGroups": ["RIC", "RIE"]
+    },
+    {
+        "name": "Công tác xã hội",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C08", "C14", "D01", "D07", "D08", "D14", "D15", "H00"],
+        "hollandGroups": ["IAS", "ISE", "ISC", "RIS", "RSC"]
+    },
+    {
+        "name": "Cơ khí",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D07", "D08"],
+        "hollandGroups": ["RIC"]
+    },
+    {
+        "name": "Cảnh sát giao thông",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C14", "D01", "D17"],
+        "hollandGroups": ["RSE"]
+    },
+    {
+        "name": "Du lịch - Lữ hành",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["ASC"]
+    },
+    {
+        "name": "Giáo dục mầm non",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["IAS"]
+    },
+    {
+        "name": "Giáo dục thể chất",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D07"],
+        "hollandGroups": ["RSC"]
+    },
+    {
+        "name": "Giáo dục đặc biệt",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["IAS"]
+    },
+    {
+        "name": "Giáo viên",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C08", "D07", "D08"],
+        "hollandGroups": ["RIS"]
+    },
+    {
+        "name": "Hành chính",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01", "D14", "D15"],
+        "hollandGroups": ["SEC"]
+    },
+    {
+        "name": "Huấn luyện viên thể thao",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C14", "D01", "D17"],
+        "hollandGroups": ["RSE"]
+    },
+    {
+        "name": "Hướng dẫn viên du lịch",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAS"]
+    },
+    {
+        "name": "Hộ sinh",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D07"],
+        "hollandGroups": ["RSC"]
+    },
+    {
+        "name": "Kiến trúc cảnh quan",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAC"]
+    },
+    {
+        "name": "Kiến trúc kỹ thuật",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "D07", "H00", "H01", "V00"],
+        "hollandGroups": ["RIA"]
+    },
+    {
+        "name": "Kiến trúc nội thất",
+        "description": "",
+        "examBlocks": ["A01", "C00", "D01", "D09", "D14", "D15", "H01"],
+        "hollandGroups": ["AEC"]
+    },
+    {
+        "name": "Kinh tế",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D07"],
+        "hollandGroups": ["IEC"]
+    },
+    {
+        "name": "Kinh tế - Chính sách công",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01"],
+        "hollandGroups": ["ISE"]
+    },
+    {
+        "name": "Kiểm toán",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D07"],
+        "hollandGroups": ["IEC"]
+    },
+    {
+        "name": "Kế toán",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C03", "D01", "D07", "D08", "D09", "D14", "D15", "H00", "H01", "V00", "V01"],
+        "hollandGroups": ["AEC", "RAC", "RIC"]
+    },
+    {
+        "name": "Kỹ thuật",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D01", "D07"],
+        "hollandGroups": ["RIE"]
+    },
+    {
+        "name": "Kỹ thuật Y học",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D07"],
+        "hollandGroups": ["RSC"]
+    },
+    {
+        "name": "Kỹ thuật cơ khí",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "D07", "H00", "H01", "V00"],
+        "hollandGroups": ["RIA"]
+    },
+    {
+        "name": "Kỹ thuật xây dựng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAC"]
+    },
+    {
+        "name": "Kỹ thuật y sinh",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "C08", "D01", "D07", "D08"],
+        "hollandGroups": ["RIE", "RIS"]
+    },
+    {
+        "name": "Kỹ thuật điện – tự động hóa",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D07", "D08"],
+        "hollandGroups": ["RIC"]
+    },
+    {
+        "name": "Logistics",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C01", "C14", "D01", "D07", "D17"],
+        "hollandGroups": ["IEC", "REC", "RIE", "RSE"]
+    },
+    {
+        "name": "Luật",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01", "D07", "D14", "D15"],
+        "hollandGroups": ["IEC", "ISE", "SEC"]
+    },
+    {
+        "name": "Lưu trữ - Thư viện",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["ASC"]
+    },
+    {
+        "name": "MC",
+        "description": "",
+        "examBlocks": ["C00", "D01", "H00", "V00", "V01", "H", "R"],
+        "hollandGroups": ["ASE"]
+    },
+    {
+        "name": "Marketing",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01", "D07", "D09", "D14", "D15", "H00", "H01", "V00", "V01", "H", "R"],
+        "hollandGroups": ["AEC", "ASE", "ISE", "RAE"]
+    },
+    {
+        "name": "Mỹ thuật công nghiệp",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "D07", "H00", "H01", "V00"],
+        "hollandGroups": ["RIA"]
+    },
+    {
+        "name": "Mỹ thuật ứng dụng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAS"]
+    },
+    {
+        "name": "Ngân hàng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C01", "C03", "D01", "D07", "D08", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["IEC", "RAC", "RIC"]
+    },
+    {
+        "name": "Ngôn ngữ",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["ASC"]
+    },
+    {
+        "name": "Nhiếp ảnh",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "D07", "H00", "H01", "V00"],
+        "hollandGroups": ["RIA"]
+    },
+    {
+        "name": "Phi công",
+        "description": "",
+        "examBlocks": ["A00", "C01", "D01", "D07"],
+        "hollandGroups": ["REC"]
+    },
+    {
+        "name": "Phân tích dữ liệu",
+        "description": "",
+        "examBlocks": ["A00", "B00", "C00", "C14", "D01"],
+        "hollandGroups": ["ISC"]
+    },
+    {
+        "name": "Phân tích xử lí dữ liệu",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D07"],
+        "hollandGroups": ["IEC"]
+    },
+    {
+        "name": "Quan hệ công chúng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01", "D09", "D14", "D15", "H00", "H01", "R00", "V00", "V01", "H", "R"],
+        "hollandGroups": ["AEC", "ASE", "IAE", "ISE", "SEC"]
+    },
+    {
+        "name": "Quan hệ quốc tế",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01"],
+        "hollandGroups": ["ISE"]
+    },
+    {
+        "name": "Quy hoạch đô thị",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C03", "D01", "D07", "D09", "H00", "H01", "V00", "V01"],
+        "hollandGroups": ["RAE", "RAS", "RIA"]
+    },
+    {
+        "name": "Quản lí công",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D07"],
+        "hollandGroups": ["IEC"]
+    },
+    {
+        "name": "Quản lí nhà nước",
+        "description": "",
+        "examBlocks": ["A00", "B00", "C00", "C14", "D01"],
+        "hollandGroups": ["ISC"]
+    },
+    {
+        "name": "Quản lí sự kiện",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C14", "D01", "D17"],
+        "hollandGroups": ["RSE"]
+    },
+    {
+        "name": "Quản lí vận hành bay",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D01", "D07"],
+        "hollandGroups": ["RIE"]
+    },
+    {
+        "name": "Quản lý giáo dục",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01"],
+        "hollandGroups": ["ISE"]
+    },
+    {
+        "name": "Quản lý nhà máy",
+        "description": "",
+        "examBlocks": ["A00", "C01", "D01", "D07"],
+        "hollandGroups": ["REC"]
+    },
+    {
+        "name": "Quản trị du lịch lữ hành",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C14", "D01", "D17"],
+        "hollandGroups": ["RSE"]
+    },
+    {
+        "name": "Quản trị kinh doanh",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01", "D07", "D14", "D15"],
+        "hollandGroups": ["IEC", "SEC"]
+    },
+    {
+        "name": "Quản trị nhân lực",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01"],
+        "hollandGroups": ["ISE"]
+    },
+    {
+        "name": "Quản trị nhân sự",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "D01", "D14", "D15"],
+        "hollandGroups": ["SEC"]
+    },
+    {
+        "name": "Quản trị sự kiện",
+        "description": "",
+        "examBlocks": ["D01", "D14", "H00", "H01", "R00", "V00"],
+        "hollandGroups": ["IAE"]
+    },
+    {
+        "name": "Quản trị nhà hàng khách sạn",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C14", "D01", "D17"],
+        "hollandGroups": ["RSE"]
+    },
+    {
+        "name": "Quản trị văn phòng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["ASC"]
+    },
+    {
+        "name": "Quảng cáo",
+        "description": "",
+        "examBlocks": ["A01", "C00", "D01", "D09", "D14", "D15", "H01"],
+        "hollandGroups": ["AEC"]
+    },
+    {
+        "name": "Robot",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D07", "D08"],
+        "hollandGroups": ["RIC"]
+    },
+    {
+        "name": "Sư phạm",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C03", "C14", "D01", "D07", "D09", "D14", "D15", "D17", "H00", "V00", "V01"],
+        "hollandGroups": ["ASC", "ISC", "RAS", "RSC", "RSE", "SEC"]
+    },
+    {
+        "name": "Thiết kế games",
+        "description": "",
+        "examBlocks": ["D01", "D14", "H00", "H01", "R00", "V00"],
+        "hollandGroups": ["IAE"]
+    },
+    {
+        "name": "Thiết kế sân khấu & kỹ thuật biểu diễn",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAS"]
+    },
+    {
+        "name": "Thiết kế sự kiện",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D07", "D09", "H00", "H01", "V00", "V01"],
+        "hollandGroups": ["RAE", "RAS"]
+    },
+    {
+        "name": "Thiết kế thời trang",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "D14", "D15", "H00", "H01", "V00", "V01", "H", "R"],
+        "hollandGroups": ["AEC", "ASE", "RAC", "RAS"]
+    },
+    {
+        "name": "Thiết kế đô thị",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAC"]
+    },
+    {
+        "name": "Thiết kế đồ họa",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "D14", "D15", "H00", "H01", "R00", "V00", "V01"],
+        "hollandGroups": ["AEC", "ASC", "IAE", "RAC"]
+    },
+    {
+        "name": "Thiết kế đồ họa ứng dụng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D07", "D09", "H00", "H01", "V00", "V01"],
+        "hollandGroups": ["RAE", "RAS"]
+    },
+    {
+        "name": "Thiết kế nội thất",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D07", "D09", "H00", "H01", "V00", "V01"],
+        "hollandGroups": ["RAE", "RAS"]
+    },
+    {
+        "name": "Thiết kế công nghiệp",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "D07", "H00", "H01", "V00"],
+        "hollandGroups": ["RIA"]
+    },
+    {
+        "name": "Thư ký văn phòng",
+        "description": "",
+        "examBlocks": ["A00", "B00", "C00", "C14", "D01"],
+        "hollandGroups": ["ISC"]
+    },
+    {
+        "name": "Thư viện",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C03", "C14", "D01", "D09", "D14", "D15", "H00", "H01", "V00", "V01"],
+        "hollandGroups": ["AEC", "IAC", "ISC", "RAC"]
+    },
+    {
+        "name": "Thú y",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C08", "D07", "D08"],
+        "hollandGroups": ["RIS"]
+    },
+    {
+        "name": "Thống kê",
+        "description": "",
+        "examBlocks": ["A00", "C00", "D01", "H00", "H01"],
+        "hollandGroups": ["IAC"]
+    },
+    {
+        "name": "Tiếp viên hàng không",
+        "description": "",
+        "examBlocks": ["A00", "C01", "D01", "D07"],
+        "hollandGroups": ["REC"]
+    },
+    {
+        "name": "Truyền thông",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["IAS", "SEC"]
+    },
+    {
+        "name": "Truyền thông - Quảng cáo",
+        "description": "",
+        "examBlocks": ["C00", "D01", "H00", "V00", "V01", "H", "R"],
+        "hollandGroups": ["ASE"]
+    },
+    {
+        "name": "Truyền thông đa phương tiện",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "D01", "D07", "D09", "D14", "D15", "H00", "H01", "R00", "V00"],
+        "hollandGroups": ["AEC", "IAE", "RAE"]
+    },
+    {
+        "name": "Tài chính",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C14", "D01", "D07", "D17"],
+        "hollandGroups": ["IEC", "RSE"]
+    },
+    {
+        "name": "Tâm lý học",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["IAS", "ISC", "ISE"]
+    },
+    {
+        "name": "Tổ chức sự kiện",
+        "description": "",
+        "examBlocks": ["C00", "D01", "H00", "V00", "V01", "H", "R"],
+        "hollandGroups": ["ASE"]
+    },
+    {
+        "name": "Xuất nhập khẩu",
+        "description": "",
+        "examBlocks": ["A00", "C01", "D01", "D07"],
+        "hollandGroups": ["REC"]
+    },
+    {
+        "name": "Xây dựng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D01", "D07", "H00", "H01", "V00"],
+        "hollandGroups": ["RAE", "RIE"]
+    },
+    {
+        "name": "Xử lí dữ liệu",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D07", "D08"],
+        "hollandGroups": ["RIC"]
+    },
+    {
+        "name": "Xử lí phân tích dữ liệu",
+        "description": "",
+        "examBlocks": ["A00", "C00", "D01", "H00", "H01"],
+        "hollandGroups": ["IAC"]
+    },
+    {
+        "name": "Y tế cộng đồng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C08", "D07", "D08"],
+        "hollandGroups": ["RIS"]
+    },
+    {
+        "name": "Y tế công cộng",
+        "description": "",
+        "examBlocks": ["A00", "B00", "C00", "C14", "D01"],
+        "hollandGroups": ["ISC"]
+    },
+    {
+        "name": "các ngành về ngôn ngữ",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C14", "D01", "D14", "D15", "H00"],
+        "hollandGroups": ["IAS"]
+    },
+    {
+        "name": "Điều dưỡng",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C00", "C08", "C14", "D01", "D07", "D08"],
+        "hollandGroups": ["RIS", "RSC"]
+    },
+    {
+        "name": "Điện ảnh",
+        "description": "",
+        "examBlocks": ["A00", "A01", "C00", "C03", "D01", "D09", "H00", "V00", "V01"],
+        "hollandGroups": ["RAC"]
+    },
+    {
+        "name": "Điện tử",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D07", "D08", "H00", "H01", "V00"],
+        "hollandGroups": ["RIA", "RIC"]
+    },
+    {
+        "name": "Đạo diễn",
+        "description": "",
+        "examBlocks": ["C00", "D01", "H00", "V00", "V01", "H", "R"],
+        "hollandGroups": ["ASE"]
+    },
+    {
+        "name": "Trí tuệ nhân tạo",
+        "description": "",
+        "examBlocks": ["A00", "A01", "B00", "C01", "D01", "D07", "D08", "D14", "H00", "H01", "R00", "V00"],
+        "hollandGroups": ["IAE", "RIC"]
+    }
+]
