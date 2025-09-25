@@ -2,107 +2,80 @@
 const Major = require('../models/Major');
 const Student = require('../models/Student');
 
-/**
- * Tạo tất cả tổ hợp (combination) k phần tử từ mảng arr
- */
-function combinations(arr, k) {
-    const result = [];
-    const combo = [];
-    function backtrack(start) {
-        if (combo.length === k) {
-            result.push(combo.slice());
-            return;
-        }
-        for (let i = start; i < arr.length; i++) {
-            combo.push(arr[i]);
-            backtrack(i + 1);
-            combo.pop();
-        }
-    }
-    backtrack(0);
-    return result;
-}
-
-/**
- * Sinh mọi hoán vị (permutation) của mảng
- */
-function permutations(arr) {
-    const res = [];
-    const used = Array(arr.length).fill(false);
-    const cur = [];
-    function backtrack() {
-        if (cur.length === arr.length) {
-            res.push(cur.join(''));
-            return;
-        }
-        for (let i = 0; i < arr.length; i++) {
-            if (used[i]) continue;
-            used[i] = true;
-            cur.push(arr[i]);
-            backtrack();
-            cur.pop();
-            used[i] = false;
-        }
-    }
-    backtrack();
-    return res;
-}
-
 exports.submitResults = async (req, res) => {
     try {
         const { personalInfo, selectedBlocks, hollandScores, scores } = req.body;
         const { name, class: studentClass, number } = personalInfo;
 
-        // 1️⃣ Sắp xếp điểm giảm dần
-        const sorted = Object.entries(hollandScores)
+        // 1️⃣ Sắp xếp nhóm theo điểm giảm dần
+        const sorted = Object.entries(hollandScores || {})
             .map(([k, v]) => [k.toUpperCase(), Number(v)])
             .sort((a, b) => b[1] - a[1]);
 
-        if (sorted.length < 3) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cần ít nhất 3 nhóm Holland để tính kết quả.'
-            });
+        // 2️⃣ Gom các nhóm có cùng điểm thành từng "bucket"
+        const groupsByScore = [];
+        for (let i = 0; i < sorted.length;) {
+            const score = sorted[i][1];
+            const types = [];
+            while (i < sorted.length && sorted[i][1] === score) {
+                types.push(sorted[i][0]);
+                i++;
+            }
+            groupsByScore.push({ score, types });
         }
 
-        // 2️⃣ Xác định điểm nhóm thứ 3
-        const thirdScore = sorted[2][1];
-
-        // Lấy tất cả nhóm có điểm >= điểm nhóm thứ 3
-        const candidateGroups = sorted
-            .filter(([_, score]) => score >= thirdScore)
-            .map(([group]) => group);
-
-        // 3️⃣ Tạo tất cả chuỗi 3 ký tự có thể
-        const comboSet = new Set();
-        combinations(candidateGroups, 3).forEach(c =>
-            permutations(c).forEach(p => comboSet.add(p))
-        );
-        const hollandCombos = Array.from(comboSet); // ví dụ ["RSI","RIS","IRS",...]
-
-        // 4️⃣ Tìm ngành: khối thi khớp và hollandGroups chứa ít nhất 1 combo
-        const majors = await Major.find({
-            examBlocks: { $in: selectedBlocks },
-            hollandGroups: { $in: hollandCombos }
-        }).lean();
-
-        // 5️⃣ Tạo thông điệp phản hồi
-        let recommendationText;
-        if (majors.length > 0) {
-            const majorNames = majors.map(m => m.name).join(', ');
-            recommendationText = [
-                `Ngành nghề bạn có thể lựa chọn: ${majorNames}.`,
-                'Để biến cơ hội thành hiện thực, hãy tiếp tục tập trung rèn luyện các môn thi đại học – chìa khóa giúp bạn tiến gần hơn đến mục tiêu.'
-            ].join('\n');
-        } else {
-            recommendationText = [
-                'Có vẻ chưa có sự ăn khớp giữa sở thích, năng lực của bạn với khối thi hiện tại.',
-                'Bạn có thể trao đổi thêm với thầy cô hướng nghiệp để có góc nhìn rõ hơn.',
-                'Nhưng quan trọng nhất, hãy tập trung phát huy 2 môn học thế mạnh – đó sẽ là bước đệm chắc chắn để bạn đạt được nguyện vọng.'
-            ].join(' ');
+        // 3️⃣ Xác định topGroups
+        // Quy tắc:
+        //  - Nếu bucket cao nhất có >=4 nhóm (hoặc cả 6 nhóm bằng nhau) => rỗng
+        //  - Ngược lại, duyệt lần lượt các bucket; chỉ thêm nguyên cả bucket
+        //    nếu tổng số nhóm sau khi thêm ≤ 3. Không thêm một phần bucket.
+        let topGroups = [];
+        if (groupsByScore.length > 0) {
+            const maxBucket = groupsByScore[0];
+            if (maxBucket.types.length >= 4 || (groupsByScore.length === 1 && maxBucket.types.length === 6)) {
+                topGroups = [];
+            } else {
+                const included = [];
+                for (let bi = 0; bi < groupsByScore.length && included.length < 3; bi++) {
+                    const bucket = groupsByScore[bi];
+                    if (included.length + bucket.types.length <= 3) {
+                        bucket.types.forEach(t => included.push({ type: t, score: bucket.score }));
+                    } else {
+                        // nếu thêm cả bucket sẽ vượt quá 3 nhóm -> bỏ nguyên bucket
+                    }
+                }
+                topGroups = included;
+            }
         }
 
-        // 6️⃣ Lưu hoặc cập nhật Student (upsert)
+        // 4️⃣ Tìm ngành phù hợp: khối thi hợp lệ + có ít nhất 1 nhóm trong topGroups
+        const majors = topGroups.length > 0
+            ? await Major.find({
+                examBlocks: { $in: selectedBlocks || [] },
+                hollandGroups: { $in: topGroups.map(t => t.type) }
+            }).lean()
+            : [];
+
+        // 5️⃣ Loại bỏ ngành trùng
+        const uniqueMajors = [];
+        const seen = new Set();
+        for (const m of majors) {
+            if (!seen.has(m._id.toString())) {
+                seen.add(m._id.toString());
+                uniqueMajors.push(m);
+            }
+        }
+
+        // 6️⃣ Thông điệp gợi ý
+        let recommendationText = uniqueMajors.length
+            ? `Ngành nghề bạn có thể lựa chọn: ${uniqueMajors.map(m => m.name).join(', ')}.`
+            : 'Hiện chưa có ngành nào phù hợp với nhóm Holland và khối thi bạn chọn.';
+        if (topGroups.length === 0) {
+            recommendationText =
+                'Bạn không thiên hẳn về nhóm Holland nào, hãy làm lại test hoặc tham khảo ý kiến giáo viên.';
+        }
+
+        // 7️⃣ Lưu hoặc cập nhật Student
         const updatedStudent = await Student.findOneAndUpdate(
             { name, class: studentClass, number },
             {
@@ -110,24 +83,24 @@ exports.submitResults = async (req, res) => {
                     selectedBlocks,
                     hollandScores,
                     scores,
-                    recommendedMajors: majors,
+                    recommendedMajors: uniqueMajors,
                     createdAt: new Date()
                 }
             },
             { new: true, upsert: true }
         );
 
-        // 7️⃣ Trả kết quả
-        res.json({
+        // 8️⃣ Trả về kết quả
+        return res.json({
             success: true,
             message: 'Kết quả đã được xử lý',
-            recommendedMajors: majors,
+            topGroups,                    // 👉 chỉ trả mảng {type, score} như yêu cầu
+            recommendedMajors: uniqueMajors,
             recommendationText,
             student: updatedStudent
         });
-
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        return res.status(500).json({ success: false, message: 'Server error' });
     }
 };

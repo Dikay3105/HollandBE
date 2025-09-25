@@ -1,4 +1,3 @@
-// src/models/Major.js
 const mongoose = require('mongoose');
 
 const majorSchema = new mongoose.Schema({
@@ -6,11 +5,11 @@ const majorSchema = new mongoose.Schema({
     description: String,
     examBlocks: [String],
 
-    // Mỗi phần tử là một chuỗi 3 ký tự, ví dụ: "SEC", "RAS"
+    // Cho phép 1 ngành thuộc nhiều nhóm Holland, mỗi phần tử chỉ 1 ký tự R I A S E C
     hollandGroups: [{
         type: String,
-        match: /^[RIASEC]{3}$/,      // đúng 3 ký tự, chỉ gồm R I A S E C
-        uppercase: true,             // tự động viết hoa
+        enum: ['R', 'I', 'A', 'S', 'E', 'C'],
+        uppercase: true,
         trim: true
     }]
 });
