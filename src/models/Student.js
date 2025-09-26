@@ -40,6 +40,7 @@ const studentSchema = new mongoose.Schema({
             hollandGroups: [String]
         }
     ],
+    recommendationText: [String],
     createdAt: { type: Date, default: Date.now }
 });
 

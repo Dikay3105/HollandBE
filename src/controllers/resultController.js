@@ -84,6 +84,7 @@ exports.submitResults = async (req, res) => {
                     hollandScores,
                     scores,
                     recommendedMajors: uniqueMajors,
+                    recommendationText,
                     createdAt: new Date()
                 }
             },
