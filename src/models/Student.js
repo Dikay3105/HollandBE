@@ -4,7 +4,6 @@ const studentSchema = new mongoose.Schema({
     name: { type: String, required: true },
     class: { type: String, required: true },
 
-    // 🔑 Thêm số báo danh (integer, không âm)
     number: {
         type: Number,
         required: true,
@@ -26,9 +25,9 @@ const studentSchema = new mongoose.Schema({
     },
     scores: [
         {
-            subject: { type: String, required: true },      // Tên môn
-            currentScore: { type: Number, min: 0, max: 10 },// Điểm hiện tại
-            targetScore: { type: Number, min: 0, max: 10 }  // Điểm mong muốn
+            subject: { type: String, required: true },
+            currentScore: { type: Number, min: 0, max: 10 },
+            targetScore: { type: Number, min: 0, max: 10 }
         }
     ],
     recommendedMajors: [
@@ -41,6 +40,12 @@ const studentSchema = new mongoose.Schema({
         }
     ],
     recommendationText: [String],
+
+    // 🆕 Thêm 2 field mới
+    university: { type: String, default: '' },      // Trường ĐH mong muốn
+    major: { type: String, default: '' },    // Ngành học mong muốn
+    advice: { type: String, default: '' },
+
     createdAt: { type: Date, default: Date.now }
 });
 

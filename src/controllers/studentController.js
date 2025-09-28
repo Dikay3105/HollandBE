@@ -42,13 +42,35 @@ exports.createStudent = async (req, res) => {
  */
 exports.getStudents = async (req, res) => {
     try {
-        const list = await Student.find().sort({ createdAt: -1 });
-        res.json(list);
+        // Lấy page & limit từ query, mặc định page=1, limit=10
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+
+        // Tính số bản ghi bỏ qua
+        const skip = (page - 1) * limit;
+
+        // Chạy song song để lấy dữ liệu + tổng số bản ghi
+        const [students, total] = await Promise.all([
+            Student.find()
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Student.countDocuments()
+        ]);
+
+        res.json({
+            success: true,
+            results: students,
+            total,                // tổng số học sinh
+            page,                 // trang hiện tại
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
+
 
 /**
  * ✅ Lấy chi tiết 1 học sinh theo ID
@@ -133,22 +155,48 @@ exports.searchStudents = async (req, res) => {
             studentName,
             studentClass,
             studentNumber,
-            page = 1,
-            limit = 10
+            page,
+            limit = 1000000
         } = req.query;
 
-        const query = {};
+        const conditions = [];
 
-        if (studentName && studentName.trim() !== '') {
-            query.name = { $regex: new RegExp(studentName.trim(), 'i') };
+        // Tìm theo tên
+        if (studentName && studentName.trim()) {
+            conditions.push({
+                name: { $regex: new RegExp(studentName.trim(), 'i') }
+            });
         }
-        if (studentClass && studentClass.trim() !== '') {
-            query.class = { $regex: new RegExp(studentClass.trim(), 'i') };
+
+        // Tìm theo lớp: bỏ các số 0 thừa trước số
+        if (studentClass && studentClass.trim()) {
+            // chuẩn hóa input: hạ chữ thường & bỏ 0 trước số
+            const input = studentClass.trim().toLowerCase().replace(/0+(?=\d)/g, '');
+
+            conditions.push({
+                $expr: {
+                    $regexMatch: {
+                        input: {
+                            // hạ chữ thường và bỏ 0 thừa trong field class
+                            $replaceAll: {
+                                input: { $toLower: '$class' },
+                                find: '0',
+                                replacement: ''
+                            }
+                        },
+                        regex: input,
+                        options: 'i'
+                    }
+                }
+            });
         }
+
+        // Tìm theo số báo danh
         if (studentNumber && !isNaN(Number(studentNumber))) {
-            query.number = Number(studentNumber);
+            conditions.push({ number: Number(studentNumber) });
         }
 
+        const query = conditions.length ? { $and: conditions } : {};
         const skip = (Number(page) - 1) * Number(limit);
 
         const [results, total] = await Promise.all([
@@ -168,4 +216,5 @@ exports.searchStudents = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
+
 

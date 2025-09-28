@@ -1,11 +1,12 @@
 // src/controllers/resultController.js
+const { generateFullAdvice } = require('../helpers/aiHelper');
 const Major = require('../models/Major');
 const Student = require('../models/Student');
 
 exports.submitResults = async (req, res) => {
     try {
         const { personalInfo, selectedBlocks, hollandScores, scores } = req.body;
-        const { name, class: studentClass, number } = personalInfo;
+        const { name, class: studentClass, number, university, major } = personalInfo;
 
         // 1️⃣ Sắp xếp nhóm theo điểm giảm dần
         const sorted = Object.entries(hollandScores || {})
@@ -51,7 +52,6 @@ exports.submitResults = async (req, res) => {
         // 4️⃣ Tìm ngành phù hợp: khối thi hợp lệ + có ít nhất 1 nhóm trong topGroups
         const majors = topGroups.length > 0
             ? await Major.find({
-                examBlocks: { $in: selectedBlocks || [] },
                 hollandGroups: { $in: topGroups.map(t => t.type) }
             }).lean()
             : [];
@@ -75,9 +75,16 @@ exports.submitResults = async (req, res) => {
                 'Bạn không thiên hẳn về nhóm Holland nào, hãy làm lại test hoặc tham khảo ý kiến giáo viên.';
         }
 
+        const aiAdvice = await generateFullAdvice({
+            scores,
+            topMajors: uniqueMajors,
+            selectedBlocks,
+            hollandScores
+        });
+
         // 7️⃣ Lưu hoặc cập nhật Student
         const updatedStudent = await Student.findOneAndUpdate(
-            { name, class: studentClass, number },
+            { name, class: studentClass, number, university, major },
             {
                 $set: {
                     selectedBlocks,
@@ -85,6 +92,7 @@ exports.submitResults = async (req, res) => {
                     scores,
                     recommendedMajors: uniqueMajors,
                     recommendationText,
+                    advice: aiAdvice,
                     createdAt: new Date()
                 }
             },
@@ -98,7 +106,8 @@ exports.submitResults = async (req, res) => {
             topGroups,                    // 👉 chỉ trả mảng {type, score} như yêu cầu
             recommendedMajors: uniqueMajors,
             recommendationText,
-            student: updatedStudent
+            student: updatedStudent,
+            advice: aiAdvice
         });
     } catch (err) {
         console.error(err);
