@@ -155,6 +155,8 @@ exports.searchStudents = async (req, res) => {
             studentName,
             studentClass,
             studentNumber,
+            dateFrom,
+            dateTo,
             page,
             limit = 1000000
         } = req.query;
@@ -168,16 +170,13 @@ exports.searchStudents = async (req, res) => {
             });
         }
 
-        // Tìm theo lớp: bỏ các số 0 thừa trước số
+        // Tìm theo lớp
         if (studentClass && studentClass.trim()) {
-            // chuẩn hóa input: hạ chữ thường & bỏ 0 trước số
             const input = studentClass.trim().toLowerCase().replace(/0+(?=\d)/g, '');
-
             conditions.push({
                 $expr: {
                     $regexMatch: {
                         input: {
-                            // hạ chữ thường và bỏ 0 thừa trong field class
                             $replaceAll: {
                                 input: { $toLower: '$class' },
                                 find: '0',
@@ -194,6 +193,19 @@ exports.searchStudents = async (req, res) => {
         // Tìm theo số báo danh
         if (studentNumber && !isNaN(Number(studentNumber))) {
             conditions.push({ number: Number(studentNumber) });
+        }
+
+        // Tìm theo khoảng ngày createdAt
+        if ((dateFrom && dateFrom.trim()) || (dateTo && dateTo.trim())) {
+            const dateCondition = {};
+            if (dateFrom && dateFrom.trim()) dateCondition.$gte = new Date(dateFrom);
+            if (dateTo && dateTo.trim()) {
+                // kết thúc ngày phải là cuối ngày
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                dateCondition.$lte = toDate;
+            }
+            conditions.push({ createdAt: dateCondition });
         }
 
         const query = conditions.length ? { $and: conditions } : {};
@@ -216,5 +228,6 @@ exports.searchStudents = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
+
 
 
