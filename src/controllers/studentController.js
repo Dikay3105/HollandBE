@@ -172,23 +172,24 @@ exports.searchStudents = async (req, res) => {
 
         // Tìm theo lớp
         if (studentClass && studentClass.trim()) {
-            const input = studentClass.trim().toLowerCase().replace(/0+(?=\d)/g, '');
+            const input = studentClass.trim().toLowerCase().replace(/0+(\d+)/g, '$1');
+
             conditions.push({
                 $expr: {
-                    $regexMatch: {
-                        input: {
+                    $eq: [
+                        {
                             $replaceAll: {
-                                input: { $toLower: '$class' },
-                                find: '0',
-                                replacement: ''
+                                input: { $toLower: "$class" },
+                                find: "0",
+                                replacement: ""
                             }
                         },
-                        regex: input,
-                        options: 'i'
-                    }
+                        input
+                    ]
                 }
             });
         }
+
 
         // Tìm theo số báo danh
         if (studentNumber && !isNaN(Number(studentNumber))) {
@@ -212,7 +213,10 @@ exports.searchStudents = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
 
         const [results, total] = await Promise.all([
-            Student.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+            Student.find(query)
+                .sort({ number: 1 }) // sắp xếp tăng dần theo số báo danh
+                .skip(skip)
+                .limit(Number(limit)),
             Student.countDocuments(query)
         ]);
 
@@ -229,5 +233,58 @@ exports.searchStudents = async (req, res) => {
     }
 };
 
+function normalizeClass(cls) {
+    if (!cls) return '';
+    cls = cls.toLowerCase().trim();
+
+    // tách chữ và số, loại bỏ 0 đứng trước số
+    cls = cls.replace(/\d+/g, (num) => String(Number(num)));
+
+    return cls;
+}
+
+// Hàm so sánh lớp: số trước, chữ sau
+function compareClass(a, b) {
+    const matchA = a.match(/^(\d+)([a-z]*)(\d*)$/i);
+    const matchB = b.match(/^(\d+)([a-z]*)(\d*)$/i);
+
+    if (!matchA || !matchB) return a.localeCompare(b);
+
+    const numA = parseInt(matchA[1], 10);
+    const numB = parseInt(matchB[1], 10);
+    if (numA !== numB) return numA - numB;
+
+    const strA = matchA[2];
+    const strB = matchB[2];
+    const cmpStr = strA.localeCompare(strB);
+    if (cmpStr !== 0) return cmpStr;
+
+    const subNumA = matchA[3] ? parseInt(matchA[3], 10) : 0;
+    const subNumB = matchB[3] ? parseInt(matchB[3], 10) : 0;
+    return subNumA - subNumB;
+}
 
 
+exports.getClasses = async (req, res) => {
+    try {
+        const students = await Student.find().select('class -_id');
+        const classSet = new Set();
+
+        students.forEach(s => {
+            if (s.class && typeof s.class === 'string') {
+                const normalized = normalizeClass(s.class);
+                if (normalized) classSet.add(normalized);
+            }
+        });
+
+        const uniqueClasses = Array.from(classSet).sort(compareClass);
+
+        res.json({
+            success: true,
+            classes: uniqueClasses
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};

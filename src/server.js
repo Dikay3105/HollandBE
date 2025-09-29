@@ -27,7 +27,7 @@ app.use('/api/admin', adminRoutes);
 app.get('/', (req, res) => res.send('Server is alive!'));
 
 // Ping chính server để giữ cho Render không sleep
-cron.schedule('*/5 * * * *', async () => {
+cron.schedule('*/1 * * * *', async () => {
   try {
     await axios.get(process.env.RENDER_URL || 'https://hollandbe.onrender.com');
     console.log('Pinged server to keep it awake');
