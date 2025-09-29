@@ -7,60 +7,60 @@ const client = new OpenAI({
 
 const DEFAULT_MODEL = "qwen/qwen3-30b-a3b:free";
 
+/**
+ * Tạo lời khuyên hướng nghiệp từ dữ liệu học sinh và nhóm Holland, trả về HTML sẵn
+ */
 async function generateFullAdvice({ scores, topMajors, selectedBlock, hollandScores }) {
-    // điểm số hiện tại → mục tiêu
+    // Điểm số hiện tại → mục tiêu
     const scoreText = scores.length
-        ? scores.map(s => `• ${s.subject}: ${s.currentScore} → ${s.targetScore}`).join("\n")
-        : "• Chưa có dữ liệu điểm";
+        ? scores.map(s => `<li><strong>${s.subject}</strong>: ${s.currentScore} → ${s.targetScore}</li>`).join("")
+        : "<li>Chưa có dữ liệu điểm</li>";
 
-    // tóm tắt nhóm Holland (ghi điểm kèm giải thích ngắn)
+    // Tóm tắt nhóm Holland
     const hollandSummary = hollandScores && Object.keys(hollandScores).length
-        ? Object.entries(hollandScores).map(([k, v]) => `• ${k}: ${v}`).join("\n")
-        : "• Chưa có dữ liệu Holland";
+        ? Object.entries(hollandScores)
+            .map(([k, v]) => `<li><strong>${k}</strong>: ${v}</li>`)
+            .join("")
+        : "<li>Chưa có dữ liệu Holland</li>";
 
     const hollandDesc = `
-**Giải thích 6 nhóm Holland**  
-- **R (Realistic)**: thích lao động thực tế, kỹ thuật, cơ khí.  
-- **I (Investigative)**: ưa phân tích, nghiên cứu khoa học.  
-- **A (Artistic)**: giàu sáng tạo, nghệ thuật, thiết kế.  
-- **S (Social)**: giỏi giao tiếp, giúp đỡ, giảng dạy.  
-- **E (Enterprising)**: năng động, lãnh đạo, kinh doanh.  
-- **C (Conventional)**: cẩn thận, quản lý dữ liệu, hành chính.
+<ul>
+<li><strong>R (Realistic)</strong>: thích lao động thực tế, kỹ thuật, cơ khí.</li>
+<li><strong>I (Investigative)</strong>: ưa phân tích, nghiên cứu khoa học.</li>
+<li><strong>A (Artistic)</strong>: giàu sáng tạo, nghệ thuật, thiết kế.</li>
+<li><strong>S (Social)</strong>: giỏi giao tiếp, giúp đỡ, giảng dạy.</li>
+<li><strong>E (Enterprising)</strong>: năng động, lãnh đạo, kinh doanh.</li>
+<li><strong>C (Conventional)</strong>: cẩn thận, quản lý dữ liệu, hành chính.</li>
+</ul>
 `;
 
     const prompt = `
-Bạn là chuyên gia hướng nghiệp.
+Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng tiếng Việt, **trả về HTML**, thông tin học sinh như sau:
+- Điểm các môn học: ${scoreText}
+- Khối thi học sinh chọn: ${selectedBlock} (theo khối thi ở Việt Nam)
+- Kết quả test holland: ${hollandSummary}
+- Các ngành nghề mà giáo viên gợi ý: ${topMajors?.join(",")}
 
-### Dữ liệu học sinh
-- **Điểm hiện tại → mục tiêu:**  
-${scoreText}
-- **Ngành gợi ý hàng đầu:** ${topMajors?.join(", ") || "Chưa có"}
-- **Khối thi:** ${selectedBlock || "Chưa chọn"}
-- **Điểm Holland:**  
-${hollandSummary}
+có định dạng các đề mục rõ ràng:
 
-${hollandDesc}
+<h2>1. Tổng quan & Cải thiện điểm</h2>
+<p>Nhận xét tổng quan về điểm hiện tại, gợi ý cách cải thiện để đạt mục tiêu.</p>
 
-**Yêu cầu**: Viết **khoảng 120–150 chữ tiếng Việt**, định dạng Markdown rõ ràng với các mục sau:
+<h2>2. Phân tích Holland</h2>
+<p>Giải thích các nhóm Holland nổi trội và vì sao các ngành gợi ý phù hợp.</p>
 
-1. Tổng quan & Cải thiện điểm  
-Nhận xét mức điểm hiện tại so với mục tiêu, đề xuất cách nâng điểm.
+<h2>3. Định hướng tiếp theo</h2>
+<p>Đưa gợi ý về chọn ngành/khối thi và phát triển kỹ năng.</p>
 
-2. Phân tích Holland  
-Nêu nhóm Holland nổi trội (dựa trên điểm cao) và giải thích vì sao các ngành đã gợi ý phù hợp.
-
-3. Định hướng tiếp theo  
-Đưa gợi ý về chọn ngành/khối thi và phát triển kỹ năng.
-
-4. Top 6 ngành phù hợp  
-Liệt kê rõ ràng danh sách 6 ngành nghề đề xuất nhất dựa trên ngành gợi ý, điểm số và phân tích holland
+<h2>4. Top 6 ngành phù hợp</h2>
+<p>Đưa ra 6 ngành nghề phù hợp nhất dựa trên điểm số hiện tại của các môn, ngành thi và phân tích holland</p>
 `;
 
     try {
         const completion = await client.chat.completions.create({
             model: DEFAULT_MODEL,
             messages: [
-                { role: "system", content: "Bạn là cố vấn hướng nghiệp giàu kinh nghiệm, trả lời bằng tiếng Việt và định dạng Markdown." },
+                { role: "system", content: "Bạn là cố vấn hướng nghiệp giàu kinh nghiệm, trả lời bằng tiếng Việt, HTML sẵn, dễ render trên web." },
                 { role: "user", content: prompt },
             ],
         });

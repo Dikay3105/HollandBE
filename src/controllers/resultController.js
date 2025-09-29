@@ -84,7 +84,7 @@ exports.submitResults = async (req, res) => {
 
         // 7️⃣ Lưu hoặc cập nhật Student
         const updatedStudent = await Student.findOneAndUpdate(
-            { name, class: studentClass, number, university, major },
+            { name, class: studentClass, number },
             {
                 $set: {
                     selectedBlocks,
@@ -93,6 +93,8 @@ exports.submitResults = async (req, res) => {
                     recommendedMajors: uniqueMajors,
                     recommendationText,
                     advice: aiAdvice,
+                    university,
+                    major,
                     createdAt: new Date()
                 }
             },
