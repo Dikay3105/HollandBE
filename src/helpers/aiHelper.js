@@ -82,6 +82,9 @@ const API_KEYS = [
     process.env.OPENROUTER_API_KEY_2,
     process.env.OPENROUTER_API_KEY_3,
     process.env.OPENROUTER_API_KEY_4,
+    process.env.OPENROUTER_API_KEY_5,
+    process.env.OPENROUTER_API_KEY_6,
+    process.env.OPENROUTER_API_KEY_7,
 ];
 
 const MODEL = "qwen/qwen3-14b:free";
