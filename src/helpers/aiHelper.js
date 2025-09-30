@@ -119,7 +119,7 @@ async function generateFullAdvice({ scores, topMajors, selectedBlock, hollandSco
         : "<li>Chưa có dữ liệu Holland</li>";
 
     const prompt = `
-Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng TIẾNG VIỆT, cỡ 2/3 trang A4, **trả về HTML**, thông tin học sinh như sau:
+Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng TIẾNG VIỆT, tối đa 450 từ, không dài hơn 1 trang A4, **trả về HTML**, thông tin học sinh như sau:
 - Điểm các môn học: ${scoreText}
 - Khối thi học sinh chọn: ${selectedBlock} (theo khối thi ở Việt Nam)
 - Kết quả test holland: ${hollandSummary}
