@@ -84,7 +84,12 @@ exports.submitResults = async (req, res) => {
 
         // 7️⃣ Lưu hoặc cập nhật Student
         const updatedStudent = await Student.findOneAndUpdate(
-            { name, class: studentClass, number },
+            {
+                // so khớp name không phân biệt hoa thường
+                name: { $regex: `^${name}$`, $options: 'i' },
+                class: studentClass,
+                number
+            },
             {
                 $set: {
                     selectedBlocks,
@@ -98,9 +103,8 @@ exports.submitResults = async (req, res) => {
                     createdAt: new Date()
                 }
             },
-            { new: true, upsert: true }
+            { new: true, upsert: true } // upsert: nếu không có thì thêm mới
         );
-
         // 8️⃣ Trả về kết quả
         return res.json({
             success: true,
