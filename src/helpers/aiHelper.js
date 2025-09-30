@@ -75,6 +75,8 @@
 // module.exports = { generateFullAdvice };
 
 const OpenAI = require("openai");
+const dayjs = require("dayjs");
+
 
 // Gom 4 key vào mảng, lấy từ .env
 const API_KEYS = [
@@ -88,6 +90,20 @@ const API_KEYS = [
 ];
 
 const MODEL = "qwen/qwen3-14b:free";
+
+let exhaustedKeys = [];
+
+// Hàm kiểm tra key còn dùng được không
+function isKeyAvailable(key) {
+    const today = dayjs().format("YYYY-MM-DD");
+    exhaustedKeys = exhaustedKeys.filter(k => k.date === today); // loại bỏ key của ngày cũ
+    return !exhaustedKeys.find(k => k.key === key);
+}
+
+// Đánh dấu key hết quota
+function markKeyExhausted(key) {
+    exhaustedKeys.push({ key, date: dayjs().format("YYYY-MM-DD") });
+}
 
 /**
  * Gọi OpenRouter bằng key cụ thể
@@ -147,7 +163,7 @@ có định dạng các đề mục rõ ràng:
 
     // Thử lần lượt từng key cho tới khi thành công hoặc hết key
     for (const key of API_KEYS) {
-        if (!key) continue; // bỏ qua nếu chưa set
+        if (!key || !isKeyAvailable(key)) continue;
         try {
             console.log(`Gọi model bằng key: ${key.slice(0, 6)}...`);
             const result = await callWithKey(key, messages);
@@ -155,6 +171,10 @@ có định dạng các đề mục rõ ràng:
         } catch (err) {
             console.error(`Key ${key.slice(0, 6)}... lỗi:`, err.message);
             // Nếu 429 hoặc lỗi khác -> thử key tiếp theo
+            // Nếu lỗi quota, đánh dấu hết hạn trong ngày
+            if (err.message.includes("429")) {
+                markKeyExhausted(key);
+            }
             continue;
         }
     }

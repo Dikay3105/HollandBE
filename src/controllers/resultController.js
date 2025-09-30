@@ -92,6 +92,9 @@ exports.submitResults = async (req, res) => {
             },
             {
                 $set: {
+                    name,                    // 👉 thêm dòng này
+                    class: studentClass,
+                    number,
                     selectedBlocks,
                     hollandScores,
                     scores,

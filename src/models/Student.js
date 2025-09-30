@@ -35,8 +35,6 @@ const studentSchema = new mongoose.Schema({
             id: String,
             name: String,
             description: String,
-            examBlocks: [String],
-            hollandGroups: [String]
         }
     ],
     recommendationText: [String],
