@@ -160,7 +160,7 @@ có định dạng các đề mục rõ ràng:
 <p>Đưa gợi ý về chọn ngành/khối thi và phát triển kỹ năng.</p>
 
 <h2>4. Top 6 ngành phù hợp</h2>
-<p>Đưa ra 6 ngành nghề phù hợp nhất dựa trên điểm số hiện tại của các môn, ngành thi và phân tích holland</p>
+<p>Đưa ra 6 ngành nghề phù hợp nhất dựa trên điểm số HIỆN TẠI(không phải điểm mục tiêu) của các môn, ngành thi, khối thi mà học sinh đã chọn và phân tích holland</p>
 `;
 
     const messages = [
