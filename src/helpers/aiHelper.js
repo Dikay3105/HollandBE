@@ -84,7 +84,7 @@ const API_KEYS = [
     process.env.OPENROUTER_API_KEY_4,
 ];
 
-const MODEL = "qwen/qwen3-235b-a22b:free";
+const MODEL = "qwen/qwen3-14b:free";
 
 /**
  * Gọi OpenRouter bằng key cụ thể
@@ -116,11 +116,11 @@ async function generateFullAdvice({ scores, topMajors, selectedBlock, hollandSco
         : "<li>Chưa có dữ liệu Holland</li>";
 
     const prompt = `
-Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng tiếng Việt, cỡ 2/3 trang A4, **trả về HTML**, thông tin học sinh như sau:
+Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng TIẾNG VIỆT, cỡ 2/3 trang A4, **trả về HTML**, thông tin học sinh như sau:
 - Điểm các môn học: ${scoreText}
 - Khối thi học sinh chọn: ${selectedBlock} (theo khối thi ở Việt Nam)
 - Kết quả test holland: ${hollandSummary}
-- Các ngành nghề mà giáo viên gợi ý: ${topMajors?.join(",")}
+- Các ngành nghề mà giáo viên gợi ý: ${topMajors?.name?.join(",")}
 
 có định dạng các đề mục rõ ràng:
 
