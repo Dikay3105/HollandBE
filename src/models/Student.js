@@ -39,10 +39,16 @@ const studentSchema = new mongoose.Schema({
     ],
     recommendationText: [String],
 
-    // 🆕 Thêm 2 field mới
-    university: { type: String, default: '' },      // Trường ĐH mong muốn
-    major: { type: String, default: '' },    // Ngành học mong muốn
+    university: { type: String, default: '' },   // Trường ĐH mong muốn
+    major: { type: String, default: '' },        // Ngành học mong muốn
     advice: { type: String, default: '' },
+
+    // 👉 thêm năm học
+    schoolYear: {
+        type: Number,
+        default: () => new Date().getFullYear(), // mặc định là năm hiện tại
+        index: true                              // đánh index để query nhanh hơn
+    },
 
     createdAt: { type: Date, default: Date.now }
 });

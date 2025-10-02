@@ -151,13 +151,13 @@ Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyê
 có định dạng các đề mục rõ ràng:
 
 <h2>1. Tổng quan & Cải thiện điểm</h2>
-<p>Nhận xét tổng quan về điểm hiện tại, gợi ý cách cải thiện để đạt mục tiêu.</p>
+<p>Nhận xét tổng quan về điểm hiện tại, gợi ý cách cải thiện để đạt điểm mục tiêu.</p>
 
 <h2>2. Phân tích Holland</h2>
 <p>Giải thích các nhóm Holland nổi trội và vì sao các ngành gợi ý phù hợp.</p>
 
 <h2>3. Định hướng tiếp theo</h2>
-<p>Đưa gợi ý về chọn ngành/khối thi và phát triển kỹ năng.</p>
+<p>Đưa gợi ý về phát triển kỹ năng.</p>
 
 <h2>4. Top 6 ngành phù hợp</h2>
 <p>Đưa ra 6 ngành nghề phù hợp nhất dựa trên điểm số HIỆN TẠI(không phải điểm mục tiêu) của các môn, ngành thi, khối thi mà học sinh đã chọn và phân tích holland</p>
