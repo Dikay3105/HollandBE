@@ -142,7 +142,73 @@ async function generateFullAdvice({ scores, topMajors, selectedBlock, hollandSco
         : "<li>Chưa có dữ liệu Holland</li>";
 
     const prompt = `
-Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng TIẾNG VIỆT, tối đa 450 từ, không dài hơn 1 trang A4, **trả về HTML**, thông tin học sinh như sau:
+Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng TIẾNG VIỆT, tối đa 450 từ, không dài hơn 1 trang A4, **trả về HTML**.
+Trước tiên, cần biết quy ước khối thi ở Việt Nam (2025) như sau:
+
+- Khối A (khoa học tự nhiên):  
+  A00: Toán, Lý, Hóa  
+  A01: Toán, Lý, Anh  
+  A02: Toán, Lý, Sinh  
+  A03: Toán, Lý, Sử  
+  A04: Toán, Lý, Địa  
+  A05: Toán, Hóa, Sử  
+  A06: Toán, Hóa, Địa  
+  A07: Toán, Sử, Địa  
+  A08: Toán, Sử, Giáo dục kinh tế và pháp luật  
+  A09: Toán, Địa, Giáo dục kinh tế và pháp luật  
+  A10: Toán, Lý, Giáo dục kinh tế và pháp luật  
+  A11: Toán, Hóa, Giáo dục kinh tế và pháp luật  
+
+- Khối B (Y Dược, Sinh học, Nông – Lâm – Ngư nghiệp):  
+  B00: Toán, Hóa, Sinh  
+  B01: Toán, Lịch sử, Sinh  
+  B02: Toán, Địa, Sinh  
+  B03: Toán, Văn, Sinh  
+  B08: Toán, Anh, Sinh  
+
+- Khối C (ngôn ngữ, xã hội, nhân văn):  
+  C00: Văn, Sử, Địa  
+  C01: Văn, Toán, Lý  
+  C02: Văn, Toán, Hóa  
+  C03: Văn, Toán, Sử  
+  C04: Văn, Toán, Địa  
+  C05: Văn, Lý, Hóa  
+  C06: Văn, Lý, Sinh  
+  C07: Văn, Lý, Sử  
+  C08: Văn, Hóa, Sinh  
+  C09: Văn, Lý, Địa  
+  C10: Văn, Hóa, Sử  
+  C12: Văn, Sinh, Sử  
+  C13: Văn, Sinh, Địa  
+  C14: Văn, Toán, Giáo dục kinh tế và pháp luật  
+  C16: Văn, Lý, Giáo dục kinh tế và pháp luật  
+  C17: Văn, Hóa, Giáo dục kinh tế và pháp luật  
+  C19: Văn, Sử, Giáo dục kinh tế và pháp luật  
+
+- Khối D (ngoại ngữ, thương mại, truyền thông):  
+  D01: Toán, Văn, Anh  
+  D07: Toán, Hóa, Anh  
+  D08: Toán, Sinh, Anh  
+  D09: Toán, Anh, Sử  
+  D10: Toán, Địa, Anh  
+  D12: Văn, Hóa, Anh  
+  D13: Văn, Sinh, Anh  
+  D14: Văn, Sử, Anh  
+  D15: Văn, Địa, Anh  
+  D66: Văn, Giáo dục kinh tế và pháp luật, Anh  
+  D84: Toán, Giáo dục kinh tế và pháp luật, Anh  
+
+Ngoài ra, đây là mô tả 6 nhóm Holland (RIASEC):  
+<ul>
+<li><strong>R (Realistic)</strong>: thích lao động thực tế, kỹ thuật, cơ khí.</li>
+<li><strong>I (Investigative)</strong>: ưa phân tích, nghiên cứu khoa học.</li>
+<li><strong>A (Artistic)</strong>: giàu sáng tạo, nghệ thuật, thiết kế.</li>
+<li><strong>S (Social)</strong>: giỏi giao tiếp, giúp đỡ, giảng dạy.</li>
+<li><strong>E (Enterprising)</strong>: năng động, lãnh đạo, kinh doanh.</li>
+<li><strong>C (Conventional)</strong>: cẩn thận, quản lý dữ liệu, hành chính.</li>
+</ul>
+
+Thông tin học sinh như sau:
 - Điểm các môn học: ${scoreText}
 - Khối thi học sinh chọn: ${selectedBlock} (theo khối thi ở Việt Nam)
 - Kết quả test holland: ${hollandSummary}
@@ -157,7 +223,7 @@ có định dạng các đề mục rõ ràng:
 <p>Giải thích các nhóm Holland nổi trội và vì sao các ngành gợi ý phù hợp.</p>
 
 <h2>3. Định hướng tiếp theo</h2>
-<p>Đưa gợi ý về phát triển kỹ năng.</p>
+<p>Đưa gợi ý về chọn ngành/khối thi và phát triển kỹ năng</p>
 
 <h2>4. Top 6 ngành phù hợp</h2>
 <p>Đưa ra 6 ngành nghề phù hợp nhất dựa trên điểm số HIỆN TẠI(không phải điểm mục tiêu) của các môn, ngành thi, khối thi mà học sinh đã chọn và phân tích holland</p>

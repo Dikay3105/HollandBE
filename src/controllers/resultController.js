@@ -8,12 +8,15 @@ exports.submitResults = async (req, res) => {
         const { personalInfo, selectedBlocks, hollandScores, scores } = req.body;
         const { name, class: studentClass, number, university, major } = personalInfo;
 
+        // 👇 Thêm schoolYear (lấy từ body, nếu ko có thì mặc định năm hiện tại)
+        const schoolYear = personalInfo.schoolYear || new Date().getFullYear();
+
         // 1️⃣ Sắp xếp nhóm theo điểm giảm dần
         const sorted = Object.entries(hollandScores || {})
             .map(([k, v]) => [k.toUpperCase(), Number(v)])
             .sort((a, b) => b[1] - a[1]);
 
-        // 2️⃣ Gom các nhóm có cùng điểm thành từng "bucket"
+        // 2️⃣ Gom nhóm cùng điểm thành bucket
         const groupsByScore = [];
         for (let i = 0; i < sorted.length;) {
             const score = sorted[i][1];
@@ -26,10 +29,6 @@ exports.submitResults = async (req, res) => {
         }
 
         // 3️⃣ Xác định topGroups
-        // Quy tắc:
-        //  - Nếu bucket cao nhất có >=4 nhóm (hoặc cả 6 nhóm bằng nhau) => rỗng
-        //  - Ngược lại, duyệt lần lượt các bucket; chỉ thêm nguyên cả bucket
-        //    nếu tổng số nhóm sau khi thêm ≤ 3. Không thêm một phần bucket.
         let topGroups = [];
         if (groupsByScore.length > 0) {
             const maxBucket = groupsByScore[0];
@@ -41,15 +40,13 @@ exports.submitResults = async (req, res) => {
                     const bucket = groupsByScore[bi];
                     if (included.length + bucket.types.length <= 3) {
                         bucket.types.forEach(t => included.push({ type: t, score: bucket.score }));
-                    } else {
-                        // nếu thêm cả bucket sẽ vượt quá 3 nhóm -> bỏ nguyên bucket
                     }
                 }
                 topGroups = included;
             }
         }
 
-        // 4️⃣ Tìm ngành phù hợp: khối thi hợp lệ + có ít nhất 1 nhóm trong topGroups
+        // 4️⃣ Tìm ngành phù hợp
         const majors = topGroups.length > 0
             ? await Major.find({
                 hollandGroups: { $in: topGroups.map(t => t.type) }
@@ -66,7 +63,7 @@ exports.submitResults = async (req, res) => {
             }
         }
 
-        // 6️⃣ Thông điệp gợi ý
+        // 6️⃣ Gợi ý
         let recommendationText = uniqueMajors.length
             ? `Ngành nghề bạn có thể lựa chọn: ${uniqueMajors.map(m => m.name).join(', ')}.`
             : 'Hiện chưa có ngành nào phù hợp với nhóm Holland và khối thi bạn chọn.';
@@ -82,23 +79,20 @@ exports.submitResults = async (req, res) => {
             hollandScores
         });
 
-        // 7️⃣ Lưu hoặc cập nhật Student
+        // 7️⃣ Lưu hoặc cập nhật Student (có thêm schoolYear)
         const updatedStudent = await Student.findOneAndUpdate(
             {
-                // so khớp name không phân biệt hoa thường
                 name: { $regex: `^${name}$`, $options: 'i' },
                 class: studentClass,
                 number,
-                createdAt: {
-                    $gte: new Date(`${year}-01-01T00:00:00.000Z`),
-                    $lte: new Date(`${year}-12-31T23:59:59.999Z`)
-                }
+                schoolYear // 👈 xét thêm năm học
             },
             {
                 $set: {
-                    name,                    // 👉 thêm dòng này
+                    name,
                     class: studentClass,
                     number,
+                    schoolYear, // 👈 lưu thêm năm học
                     selectedBlocks,
                     hollandScores,
                     scores,
@@ -110,13 +104,14 @@ exports.submitResults = async (req, res) => {
                     createdAt: new Date()
                 }
             },
-            { new: true, upsert: true } // upsert: nếu không có thì thêm mới
+            { new: true, upsert: true }
         );
-        // 8️⃣ Trả về kết quả
+
+        // 8️⃣ Trả về
         return res.json({
             success: true,
             message: 'Kết quả đã được xử lý',
-            topGroups,                    // 👉 chỉ trả mảng {type, score} như yêu cầu
+            topGroups,
             recommendedMajors: uniqueMajors,
             recommendationText,
             student: updatedStudent,
