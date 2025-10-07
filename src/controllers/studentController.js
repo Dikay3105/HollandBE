@@ -171,24 +171,17 @@ exports.searchStudents = async (req, res) => {
         }
 
         // Tìm theo lớp
+        // Tìm theo lớp
         if (studentClass && studentClass.trim()) {
-            const input = studentClass.trim().toLowerCase().replace(/0+(\d+)/g, '$1');
+            const input = studentClass.trim().toLowerCase();
 
-            conditions.push({
-                $expr: {
-                    $eq: [
-                        {
-                            $replaceAll: {
-                                input: { $toLower: "$class" },
-                                find: "0",
-                                replacement: ""
-                            }
-                        },
-                        input
-                    ]
-                }
-            });
+            // Chuyển "12a09" -> regex dạng /^12a0*9$/ để khớp cả "12a9" và "12a09"
+            const normalized = input.replace(/(\d+)/g, (m) => `0*${parseInt(m, 10)}`);
+            const regex = new RegExp(`^${normalized}$`, 'i');
+
+            conditions.push({ class: { $regex: regex } });
         }
+
 
 
         // Tìm theo số báo danh
