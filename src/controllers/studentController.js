@@ -157,44 +157,44 @@ exports.searchStudents = async (req, res) => {
             studentNumber,
             dateFrom,
             dateTo,
+            schoolYear, // 👈 thêm ở đây
             page,
             limit = 1000000
         } = req.query;
 
         const conditions = [];
 
-        // Tìm theo tên
+        // 🔹 Tìm theo tên
         if (studentName && studentName.trim()) {
             conditions.push({
                 name: { $regex: new RegExp(studentName.trim(), 'i') }
             });
         }
 
-        // Tìm theo lớp
-        // Tìm theo lớp
+        // 🔹 Tìm theo lớp
         if (studentClass && studentClass.trim()) {
             const input = studentClass.trim().toLowerCase();
-
-            // Chuyển "12a09" -> regex dạng /^12a0*9$/ để khớp cả "12a9" và "12a09"
+            // Chuyển "12a09" -> regex /^12a0*9$/ để khớp cả "12a9" và "12a09"
             const normalized = input.replace(/(\d+)/g, (m) => `0*${parseInt(m, 10)}`);
             const regex = new RegExp(`^${normalized}$`, 'i');
-
             conditions.push({ class: { $regex: regex } });
         }
 
-
-
-        // Tìm theo số báo danh
+        // 🔹 Tìm theo số báo danh
         if (studentNumber && !isNaN(Number(studentNumber))) {
             conditions.push({ number: Number(studentNumber) });
         }
 
-        // Tìm theo khoảng ngày createdAt
+        // 🔹 Tìm theo niên khóa
+        if (schoolYear && !isNaN(Number(schoolYear)) && schoolYear != 0) {
+            conditions.push({ schoolYear: Number(schoolYear) });
+        }
+
+        // 🔹 Tìm theo khoảng ngày createdAt
         if ((dateFrom && dateFrom.trim()) || (dateTo && dateTo.trim())) {
             const dateCondition = {};
             if (dateFrom && dateFrom.trim()) dateCondition.$gte = new Date(dateFrom);
             if (dateTo && dateTo.trim()) {
-                // kết thúc ngày phải là cuối ngày
                 const toDate = new Date(dateTo);
                 toDate.setHours(23, 59, 59, 999);
                 dateCondition.$lte = toDate;
@@ -207,7 +207,7 @@ exports.searchStudents = async (req, res) => {
 
         const [results, total] = await Promise.all([
             Student.find(query)
-                .sort({ number: 1 }) // sắp xếp tăng dần theo số báo danh
+                .sort({ number: 1 })
                 .skip(skip)
                 .limit(Number(limit)),
             Student.countDocuments(query)
@@ -226,6 +226,7 @@ exports.searchStudents = async (req, res) => {
     }
 };
 
+
 function normalizeClass(cls) {
     if (!cls) return '';
     cls = cls.toLowerCase().trim();
@@ -233,7 +234,7 @@ function normalizeClass(cls) {
     // tách chữ và số, loại bỏ 0 đứng trước số
     cls = cls.replace(/\d+/g, (num) => String(Number(num)));
 
-    return cls;
+    return cls.toUpperCase().trim();
 }
 
 // Hàm so sánh lớp: số trước, chữ sau
