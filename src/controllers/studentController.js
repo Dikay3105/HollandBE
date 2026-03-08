@@ -1,6 +1,19 @@
 // src/controllers/studentController.js
 const Student = require('../models/Student');
 
+// Hàm helper tính niên khóa hiện tại (dùng nếu cần override hoặc log)
+function getCurrentSchoolYear() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-12
+
+    if (month >= 8) {
+        return `${year}-${year + 1}`;
+    } else {
+        return `${year - 1}-${year}`;
+    }
+}
+
 /**
  * ✅ Tạo mới học sinh
  */
@@ -13,7 +26,8 @@ exports.createStudent = async (req, res) => {
             selectedBlocks,
             hollandScores,
             scores,
-            recommendedMajors
+            recommendedMajors,
+            schoolYear, // client có thể gửi thủ công, nếu không thì schema default tự tính
         } = req.body;
 
         const student = await Student.create({
@@ -23,54 +37,50 @@ exports.createStudent = async (req, res) => {
             selectedBlocks,
             hollandScores,
             scores,
-            recommendedMajors
+            recommendedMajors,
+            schoolYear: schoolYear || undefined, // nếu client gửi thì dùng, không thì default schema
         });
 
         res.status(201).json({
             success: true,
             message: 'Tạo học sinh thành công',
-            data: student
+            data: student,
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: 'Lỗi server' });
+        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
     }
 };
 
 /**
- * ✅ Lấy toàn bộ danh sách học sinh
+ * ✅ Lấy toàn bộ danh sách học sinh (phân trang)
  */
 exports.getStudents = async (req, res) => {
     try {
-        // Lấy page & limit từ query, mặc định page=1, limit=10
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 5;
-
-        // Tính số bản ghi bỏ qua
         const skip = (page - 1) * limit;
 
-        // Chạy song song để lấy dữ liệu + tổng số bản ghi
         const [students, total] = await Promise.all([
             Student.find()
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
-            Student.countDocuments()
+            Student.countDocuments(),
         ]);
 
         res.json({
             success: true,
             results: students,
-            total,                // tổng số học sinh
-            page,                 // trang hiện tại
-            totalPages: Math.ceil(total / limit)
+            total,
+            page,
+            totalPages: Math.ceil(total / limit),
         });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
-
 
 /**
  * ✅ Lấy chi tiết 1 học sinh theo ID
@@ -100,23 +110,31 @@ exports.updateStudent = async (req, res) => {
             selectedBlocks,
             hollandScores,
             scores,
-            recommendedMajors
+            recommendedMajors,
+            schoolYear, // hỗ trợ update thủ công nếu cần
         } = req.body;
 
-        const student = await Student.findByIdAndUpdate(
-            req.params.id,
-            {
-                name,
-                class: studentClass,
-                number,
-                selectedBlocks,
-                hollandScores,
-                scores,
-                recommendedMajors,
-                createdAt: new Date()
-            },
-            { new: true }
-        );
+        const updateData = {
+            name,
+            class: studentClass,
+            number,
+            selectedBlocks,
+            hollandScores,
+            scores,
+            recommendedMajors,
+        };
+
+        if (schoolYear) {
+            updateData.schoolYear = schoolYear;
+        }
+
+        // Không update createdAt khi edit (trừ khi bạn cố ý muốn reset)
+        // Nếu muốn reset: updateData.createdAt = new Date();
+
+        const student = await Student.findByIdAndUpdate(req.params.id, updateData, {
+            new: true,
+            runValidators: true,
+        });
 
         if (!student) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy học sinh' });
@@ -125,7 +143,7 @@ exports.updateStudent = async (req, res) => {
         res.json({ success: true, message: 'Cập nhật thành công', data: student });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: 'Lỗi server' });
+        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
     }
 };
 
@@ -147,7 +165,7 @@ exports.deleteStudent = async (req, res) => {
 
 /**
  * ✅ Tìm kiếm + phân trang
- * GET /api/students/search?studentName=&studentClass=&studentNumber=&page=&limit=
+ * GET /api/students/search?studentName=&studentClass=&studentNumber=&schoolYear=2025-2026&page=&limit=
  */
 exports.searchStudents = async (req, res) => {
     try {
@@ -157,40 +175,35 @@ exports.searchStudents = async (req, res) => {
             studentNumber,
             dateFrom,
             dateTo,
-            schoolYear, // 👈 thêm ở đây
-            page,
-            limit = 1000000
+            schoolYear, // giờ là string "2025-2026"
+            page = 1,
+            limit = 20, // thay vì 1000000 để tránh overload, có thể để client gửi limit lớn nếu cần
         } = req.query;
 
         const conditions = [];
 
-        // 🔹 Tìm theo tên
         if (studentName && studentName.trim()) {
             conditions.push({
-                name: { $regex: new RegExp(studentName.trim(), 'i') }
+                name: { $regex: new RegExp(studentName.trim(), 'i') },
             });
         }
 
-        // 🔹 Tìm theo lớp
         if (studentClass && studentClass.trim()) {
             const input = studentClass.trim().toLowerCase();
-            // Chuyển "12a09" -> regex /^12a0*9$/ để khớp cả "12a9" và "12a09"
             const normalized = input.replace(/(\d+)/g, (m) => `0*${parseInt(m, 10)}`);
             const regex = new RegExp(`^${normalized}$`, 'i');
             conditions.push({ class: { $regex: regex } });
         }
 
-        // 🔹 Tìm theo số báo danh
         if (studentNumber && !isNaN(Number(studentNumber))) {
             conditions.push({ number: Number(studentNumber) });
         }
 
-        // 🔹 Tìm theo niên khóa
-        if (schoolYear && !isNaN(Number(schoolYear)) && schoolYear != 0) {
-            conditions.push({ schoolYear: Number(schoolYear) });
+        // Sửa phần schoolYear: so sánh string trực tiếp
+        if (schoolYear && typeof schoolYear === 'string' && schoolYear.trim()) {
+            conditions.push({ schoolYear: schoolYear.trim() });
         }
 
-        // 🔹 Tìm theo khoảng ngày createdAt
         if ((dateFrom && dateFrom.trim()) || (dateTo && dateTo.trim())) {
             const dateCondition = {};
             if (dateFrom && dateFrom.trim()) dateCondition.$gte = new Date(dateFrom);
@@ -207,10 +220,10 @@ exports.searchStudents = async (req, res) => {
 
         const [results, total] = await Promise.all([
             Student.find(query)
-                .sort({ number: 1 })
+                .sort({ number: 1 }) // hoặc sort theo class/number nếu cần
                 .skip(skip)
                 .limit(Number(limit)),
-            Student.countDocuments(query)
+            Student.countDocuments(query),
         ]);
 
         res.json({
@@ -218,26 +231,25 @@ exports.searchStudents = async (req, res) => {
             results,
             total,
             page: Number(page),
-            totalPages: Math.ceil(total / Number(limit))
+            totalPages: Math.ceil(total / Number(limit)),
+            currentSchoolYear: getCurrentSchoolYear(), // optional: gửi thêm để frontend biết
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: 'Lỗi server' });
+        res.status(500).json({ success: false, message: 'Lỗi server', error: err.message });
     }
 };
 
-
+/**
+ * Hàm normalizeClass và compareClass giữ nguyên (đã tốt)
+ */
 function normalizeClass(cls) {
     if (!cls) return '';
     cls = cls.toLowerCase().trim();
-
-    // tách chữ và số, loại bỏ 0 đứng trước số
     cls = cls.replace(/\d+/g, (num) => String(Number(num)));
-
     return cls.toUpperCase().trim();
 }
 
-// Hàm so sánh lớp: số trước, chữ sau
 function compareClass(a, b) {
     const matchA = a.match(/^(\d+)([a-z]*)(\d*)$/i);
     const matchB = b.match(/^(\d+)([a-z]*)(\d*)$/i);
@@ -258,13 +270,15 @@ function compareClass(a, b) {
     return subNumA - subNumB;
 }
 
-
+/**
+ * ✅ Lấy danh sách lớp duy nhất
+ */
 exports.getClasses = async (req, res) => {
     try {
         const students = await Student.find().select('class -_id');
         const classSet = new Set();
 
-        students.forEach(s => {
+        students.forEach((s) => {
             if (s.class && typeof s.class === 'string') {
                 const normalized = normalizeClass(s.class);
                 if (normalized) classSet.add(normalized);
@@ -275,7 +289,7 @@ exports.getClasses = async (req, res) => {
 
         res.json({
             success: true,
-            classes: uniqueClasses
+            classes: uniqueClasses,
         });
     } catch (err) {
         console.error(err);

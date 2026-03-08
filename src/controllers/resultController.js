@@ -28,22 +28,34 @@ exports.submitResults = async (req, res) => {
             groupsByScore.push({ score, types });
         }
 
-        // 3️⃣ Xác định topGroups
+        // 3️⃣ Xác định topGroups - fix: không lấy lẻ từ bucket sau, chỉ lấy bucket fit nguyên
         let topGroups = [];
         if (groupsByScore.length > 0) {
             const maxBucket = groupsByScore[0];
             if (maxBucket.types.length >= 4 || (groupsByScore.length === 1 && maxBucket.types.length === 6)) {
-                topGroups = [];
+                topGroups = [];  // discard trường hợp đặc biệt
             } else {
                 const included = [];
-                for (let bi = 0; bi < groupsByScore.length && included.length < 3; bi++) {
+                for (let bi = 0; bi < groupsByScore.length; bi++) {
                     const bucket = groupsByScore[bi];
-                    if (included.length + bucket.types.length <= 3) {
-                        bucket.types.forEach(t => included.push({ type: t, score: bucket.score }));
+                    if (included.length + bucket.types.length > 3) {
+                        break;  // Không fit nguyên → dừng, không lấy lẻ
                     }
+                    bucket.types.forEach(t => included.push({ type: t, score: bucket.score }));
+                    if (included.length >= 3) break;
                 }
                 topGroups = included;
             }
+        }
+
+        // Tạo chuỗi mã Holland (ví dụ: EI hoặc IE)
+        const hollandCode = topGroups.map(g => g.type).join('');
+        console.log("Top groups:", topGroups);
+        console.log("Mã Holland:", hollandCode);
+
+        // Escape ký tự đặc biệt trong regex (tránh lỗi nếu tên có . * ? ...)
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
         // 4️⃣ Tìm ngành phù hợp
@@ -79,33 +91,50 @@ exports.submitResults = async (req, res) => {
             hollandScores
         });
 
-        // 7️⃣ Lưu hoặc cập nhật Student (có thêm schoolYear)
+        // 7️⃣ Lưu hoặc cập nhật Student (upsert dựa trên name + class + number + schoolYear)
         const updatedStudent = await Student.findOneAndUpdate(
             {
-                name: { $regex: `^${name}$`, $options: 'i' },
+                // Match chính xác, case-insensitive cho name
+                name: { $regex: new RegExp(`^${escapeRegex(name)}$`, 'i') },
                 class: studentClass,
-                number,
-                schoolYear // 👈 xét thêm năm học
+                number: number,               // đảm bảo number là Number
+                schoolYear: schoolYear        // String "2025-2026" – match chính xác
             },
             {
                 $set: {
                     name,
                     class: studentClass,
                     number,
-                    schoolYear, // 👈 lưu thêm năm học
-                    selectedBlocks,
-                    hollandScores,
-                    scores,
-                    recommendedMajors: uniqueMajors,
-                    recommendationText,
-                    advice: aiAdvice,
-                    university,
-                    major,
+                    schoolYear,
+                    selectedBlocks: selectedBlocks || [],          // fallback nếu undefined
+                    hollandScores: hollandScores || {},            // fallback
+                    scores: scores || [],
+                    recommendedMajors: uniqueMajors || [],
+                    recommendationText: recommendationText || [],
+                    advice: aiAdvice || '',
+                    university: university || '',
+                    major: major || '',
+                    // KHÔNG set createdAt ở đây để tránh reset khi update
+                    // createdAt chỉ tự động khi insert (schema default)
+                },
+                // Nếu muốn reset createdAt chỉ khi tạo mới, dùng $setOnInsert
+                $setOnInsert: {
                     createdAt: new Date()
                 }
             },
-            { new: true, upsert: true }
+            {
+                new: true,          // trả về document sau update
+                upsert: true,       // tạo mới nếu không tìm thấy
+                runValidators: true // chạy validation schema khi upsert
+            }
         );
+
+        // Optional: log để debug
+        console.log('Student upserted:', {
+            id: updatedStudent._id,
+            action: updatedStudent.createdAt.getTime() === new Date().getTime() ? 'created' : 'updated',
+            schoolYear: updatedStudent.schoolYear
+        });
 
         // 8️⃣ Trả về
         return res.json({
