@@ -96,7 +96,13 @@ const API_KEYS = [
     process.env.OPENROUTER_API_KEY_14,
 ];
 
-const MODEL = "qwen/qwen3-14b:free";
+const MODEL_LIST = [
+    "stepfun/step-3.5-flash:free",          // Ưu tiên 1: Reasoning mạnh, nhanh
+    "arcee-ai/trinity-large-preview:free",  // Ưu tiên 2: Chat tự nhiên
+    "z-ai/glm-4.5-air:free",              // Ưu tiên 3: Multilingual tốt (tiếng Việt)
+    "nvidia/nemotron-3-nano-30b-a3b:free",  // Ưu tiên 4: Logic ổn
+    "openrouter/free"                       // Cuối: Random free, cứu khi hết
+];
 
 let exhaustedKeys = [];
 
@@ -234,21 +240,43 @@ có định dạng các đề mục rõ ràng:
         { role: "user", content: prompt },
     ];
 
-    // Thử lần lượt từng key cho tới khi thành công hoặc hết key
-    for (const key of API_KEYS) {
-        if (!key || !isKeyAvailable(key)) continue;
-        try {
-            console.log(`Gọi model bằng key: ${key.slice(0, 6)}...`);
-            const result = await callWithKey(key, messages);
-            return result;
-        } catch (err) {
-            console.error(`Key ${key.slice(0, 6)}... lỗi:`, err.message);
-            // Nếu 429 hoặc lỗi khác -> thử key tiếp theo
-            // Nếu lỗi quota, đánh dấu hết hạn trong ngày
-            if (err.message.includes("429")) {
-                markKeyExhausted(key);
+    // Thử lần lượt từng model
+    for (const model of MODEL_LIST) {
+        console.log(`Thử model: ${model}`);
+
+        // Với mỗi model, thử lần lượt key
+        for (const key of API_KEYS) {
+            if (!key || !isKeyAvailable(key)) continue;
+
+            for (let attempt = 1; attempt <= 2; attempt++) {  // Retry 1 lần nếu lỗi không phải 429
+                try {
+                    console.log(`  -> Key ${key.slice(0, 6)}... (lần ${attempt}), model ${model}`);
+                    const client = new OpenAI({  // Tạo client mới mỗi lần để tránh cache lỗi
+                        apiKey: key,
+                        baseURL: "https://openrouter.ai/api/v1",
+                    });
+                    const res = await client.chat.completions.create({
+                        model: model,
+                        messages,
+                    });
+                    const result = res.choices[0].message.content.trim();
+                    console.log(`Thành công với ${model} + key ${key.slice(0, 6)}...`);
+                    return result;
+                } catch (err) {
+                    console.error(`Lỗi với key ${key.slice(0, 6)}... model ${model}:`, err.message);
+
+                    if (err.message.includes("429")) {
+                        markKeyExhausted(key);  // Chỉ mark khi 429
+                        break;  // Skip key này, thử key khác hoặc model khác
+                    }
+
+                    // Lỗi khác (network, 500, timeout...) -> retry attempt
+                    if (attempt === 2) continue;  // Hết retry thì skip combo này
+
+                    // Delay backoff nhỏ
+                    await new Promise(r => setTimeout(r, 2000 * attempt));
+                }
             }
-            continue;
         }
     }
 

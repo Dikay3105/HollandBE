@@ -3,13 +3,25 @@ const { generateFullAdvice } = require('../helpers/aiHelper');
 const Major = require('../models/Major');
 const Student = require('../models/Student');
 
+function getCurrentSchoolYear() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-12
+
+    if (month >= 8) {
+        return `${year}-${year + 1}`;
+    } else {
+        return `${year - 1}-${year}`;
+    }
+}
+
 exports.submitResults = async (req, res) => {
     try {
         const { personalInfo, selectedBlocks, hollandScores, scores } = req.body;
         const { name, class: studentClass, number, university, major } = personalInfo;
 
         // 👇 Thêm schoolYear (lấy từ body, nếu ko có thì mặc định năm hiện tại)
-        const schoolYear = personalInfo.schoolYear || new Date().getFullYear();
+        const schoolYear = personalInfo.schoolYear || getCurrentSchoolYear();
 
         // 1️⃣ Sắp xếp nhóm theo điểm giảm dần
         const sorted = Object.entries(hollandScores || {})

@@ -24,8 +24,8 @@ const Student = require('./src/models/Student'); // đường dẫn tới file m
         await mongoose.connect('mongodb+srv://dikay:khoa3105@cluster0.jzw7jpi.mongodb.net/holland?retryWrites=true&w=majority&appName=Cluster0');
         // update toàn bộ student chưa có schoolYear
         const result = await Student.updateMany(
-            { schoolYear: { $exists: false } },  // chỉ update doc nào chưa có schoolYear
-            { $set: { schoolYear: 2025 } }
+            { schoolYear: { $exists: true } },  // chỉ update doc nào chưa có schoolYear
+            { $set: { schoolYear: '2025-2026' } }
         );
 
         console.log(`✅ Đã update ${result.modifiedCount} học sinh với schoolYear = 2025`);
