@@ -148,7 +148,10 @@ async function generateFullAdvice({ scores, topMajors, selectedBlock, hollandSco
         : "<li>Chưa có dữ liệu Holland</li>";
 
     const prompt = `
-Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng TIẾNG VIỆT, tối đa 450 từ, không dài hơn 1 trang A4, **trả về HTML**.
+Bạn là chuyên gia hướng nghiệp giàu kinh nghiệm. Viết lời khuyên bằng TIẾNG VIỆT, tối đa 450 từ, không dài hơn 1 trang A4, **trả về HTML**, không dùng style .whitespace-pre-line {
+    white-space: pre-line;
+} 
+trong html please.
 Trước tiên, cần biết quy ước khối thi ở Việt Nam (2025) như sau:
 
 - Khối A (khoa học tự nhiên):  
