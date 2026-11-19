@@ -2,6 +2,7 @@
 // Thống kê chi tiết cho trang admin.
 const Student = require('../models/Student');
 const Option = require('../models/Option');
+const { majorField, universityType } = require('../utils/fields');
 
 const HOLLAND = ['R', 'I', 'A', 'S', 'E', 'C'];
 
@@ -80,7 +81,7 @@ exports.getDetailedStats = async (req, res) => {
 
     const [students, schoolYears, universityOptions, majorOptions] = await Promise.all([
         Student.find(filter)
-            .select('class schoolYear selectedBlocks hollandScores university major universityOther majorOther advice createdAt')
+            .select('class schoolYear selectedBlocks hollandScores scores university major universityOther majorOther advice adviceStatus createdAt')
             .lean(),
         Student.distinct('schoolYear'),
         Option.find({ type: 'university' }).select('name').lean(),
@@ -133,6 +134,76 @@ exports.getDetailedStats = async (req, res) => {
     const byMajor = countByName(withMajor.map(s => s.major));
     const classes = countSimple(students.map(s => String(s.class || '').toUpperCase()));
 
+    // Nhóm Holland nổi trội theo khối lớp (10/11/12) – cho heatmap
+    const gradeOf = cls => {
+        const m = String(cls || '').match(/^(\d{1,2})/);
+        return m && ['10', '11', '12'].includes(m[1]) ? m[1] : 'Khác';
+    };
+    const gradeMap = new Map();
+    for (const s of students) {
+        const g = gradeOf(s.class);
+        if (!gradeMap.has(g)) gradeMap.set(g, { grade: g, total: 0, withHolland: 0, dominant: { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 } });
+        const row = gradeMap.get(g);
+        row.total++;
+        const top = topHollandTypes(s.hollandScores);
+        if (top.length) {
+            row.withHolland++;
+            top.forEach(t => row.dominant[t]++);
+        }
+    }
+    const byGrade = [...gradeMap.values()].sort((a, b) => a.grade.localeCompare(b.grade, 'vi', { numeric: true }));
+
+    // Điểm trung bình hiện tại → mục tiêu theo môn (bỏ điểm 0 = chưa nhập) – cho biểu đồ dumbbell
+    const subjMap = new Map();
+    for (const s of students) {
+        for (const sc of s.scores || []) {
+            const name = String(sc.subject || '').trim();
+            const cur = Number(sc.currentScore) || 0;
+            const tgt = Number(sc.targetScore) || 0;
+            if (!name || cur <= 0 || tgt <= 0) continue;
+            const key = normKey(name);
+            if (!subjMap.has(key)) subjMap.set(key, { subject: name, n: 0, cur: 0, tgt: 0 });
+            const e = subjMap.get(key);
+            e.n++;
+            e.cur += cur;
+            e.tgt += tgt;
+        }
+    }
+    const round1 = x => Math.round(x * 10) / 10;
+    const subjects = [...subjMap.values()]
+        .filter(e => e.n >= 3)
+        .map(e => ({ subject: e.subject, n: e.n, avgCurrent: round1(e.cur / e.n), avgTarget: round1(e.tgt / e.n) }))
+        .map(e => ({ ...e, gap: round1(e.avgTarget - e.avgCurrent) }))
+        .sort((a, b) => b.gap - a.gap);
+
+    // Nguyện vọng theo nhóm: lĩnh vực ngành (tổng + theo khối lớp) và nhóm trường
+    const fieldCounts = {};
+    const fieldByGrade = new Map(); // grade -> { total, values: {field: n} }
+    const uniTypeCounts = {};
+    for (const s of students) {
+        const field = majorField(s.major);
+        if (field) {
+            fieldCounts[field] = (fieldCounts[field] || 0) + 1;
+            const g = gradeOf(s.class);
+            if (!fieldByGrade.has(g)) fieldByGrade.set(g, { grade: g, total: 0, values: {} });
+            const row = fieldByGrade.get(g);
+            row.total++;
+            row.values[field] = (row.values[field] || 0) + 1;
+        }
+        const ut = universityType(s.university);
+        if (ut) uniTypeCounts[ut] = (uniTypeCounts[ut] || 0) + 1;
+    }
+    const toList = obj => Object.entries(obj).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+
+    // Nguồn lời khuyên: AI / mẫu / đang viết / chưa có (bản ghi cũ không có adviceStatus: có nội dung = AI)
+    const adviceSources = { ai: 0, fallback: 0, pending: 0, none: 0 };
+    for (const s of students) {
+        if (s.adviceStatus === 'pending') adviceSources.pending++;
+        else if (s.adviceStatus === 'fallback') adviceSources.fallback++;
+        else if (s.advice && s.advice.trim()) adviceSources.ai++;
+        else adviceSources.none++;
+    }
+
     res.json({
         success: true,
         data: {
@@ -169,6 +240,16 @@ exports.getDetailedStats = async (req, res) => {
             examBlocks: countSimple(students.flatMap(s => s.selectedBlocks || [])),
             byClass: classes.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true })),
             byDay,
+            byGrade,
+            majorFields: toList(fieldCounts),
+            majorFieldsByGrade: [...fieldByGrade.values()].sort((a, b) => a.grade.localeCompare(b.grade, 'vi', { numeric: true })),
+            universityTypes: toList(uniTypeCounts),
+            subjects,
+            composition: {
+                major: { catalog: withMajor.length - otherMajorStudents.length, other: otherMajorStudents.length, none: total - withMajor.length },
+                university: { catalog: withUniversity.length - otherUniStudents.length, other: otherUniStudents.length, none: total - withUniversity.length },
+                advice: adviceSources,
+            },
         },
     });
 };

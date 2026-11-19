@@ -71,11 +71,11 @@ const deadModels = new Set();         // model bị gỡ / không dùng được
 const jsonCapableModels = new Set();  // hỗ trợ response_format=json_object
 const reasoningModels = new Set();    // hỗ trợ tham số reasoning
 const reasoningRequired = new Set();  // model không cho tắt reasoning
-// model -> { cooldownUntil, strikes, avgMs, ok }
+// model -> { cooldownUntil, strikes, avgMs (tổng), avgFirstMs (tới chữ đầu tiên), ok }
 const modelHealth = new Map();
 
 function health(model) {
-    if (!modelHealth.has(model)) modelHealth.set(model, { cooldownUntil: 0, strikes: 0, avgMs: null, ok: 0 });
+    if (!modelHealth.has(model)) modelHealth.set(model, { cooldownUntil: 0, strikes: 0, avgMs: null, avgFirstMs: null, ok: 0 });
     return modelHealth.get(model);
 }
 
@@ -87,12 +87,14 @@ function markOverloaded(model) {
     console.log(`AI: tạm bỏ ${model} ${Math.round(ms / 1000)}s (quá tải lần ${h.strikes})`);
 }
 
-function markSuccess(model, ms) {
+function markSuccess(model, ms, firstMs) {
     const h = health(model);
     h.strikes = 0;
     h.cooldownUntil = 0;
     h.ok += 1;
     h.avgMs = h.avgMs === null ? ms : Math.round(h.avgMs * 0.6 + ms * 0.4);
+    const f = firstMs ?? ms;
+    h.avgFirstMs = h.avgFirstMs === null ? f : Math.round(h.avgFirstMs * 0.6 + f * 0.4);
 }
 
 function getPreferred() {
@@ -149,8 +151,10 @@ async function rankModels() {
     const list = await getModelList();
     const now = Date.now();
     const usable = list.filter(m => !deadModels.has(m) && health(m).cooldownUntil <= now);
-    const proven = usable.filter(m => m !== FALLBACK_ROUTER && health(m).avgMs !== null)
-        .sort((a, b) => health(a).avgMs - health(b).avgMs);
+    // Xếp theo thời gian tới chữ đầu tiên: học sinh thấy chữ sớm quan trọng hơn tổng thời gian
+    // (VD model trả hết 1 lần sau 11s thua model stream ra chữ sau 2s dù viết xong lâu hơn)
+    const proven = usable.filter(m => m !== FALLBACK_ROUTER && health(m).avgFirstMs !== null)
+        .sort((a, b) => health(a).avgFirstMs - health(b).avgFirstMs);
     const rest = usable.filter(m => !proven.includes(m) && m !== FALLBACK_ROUTER);
     const ranked = [...proven, ...rest];
     if (usable.includes(FALLBACK_ROUTER)) ranked.push(FALLBACK_ROUTER);
@@ -460,7 +464,9 @@ async function generateFullAdvice({
                 const ac = new AbortController();
                 laneControllers[laneId].add(ac);
                 const started = Date.now();
+                let callFirstAt = null; // chữ đầu tiên của lần gọi này (để xếp hạng model)
                 const onText = raw => {
+                    if (callFirstAt === null) callFirstAt = Date.now();
                     if (streamOwner === null) {
                         streamOwner = laneId;
                         firstTextAt = firstTextAt || Date.now();
@@ -475,7 +481,7 @@ async function generateFullAdvice({
                     laneControllers[laneId].delete(ac);
                     if (winner) return null;
                     winner = { data, model };
-                    markSuccess(model, Date.now() - started);
+                    markSuccess(model, Date.now() - started, callFirstAt ? callFirstAt - started : null);
                     console.log(`AI OK [lane ${laneId}]: ${model} sau ${((Date.now() - started) / 1000).toFixed(1)}s (key ${mask(key)})`);
                     return winner;
                 } catch (err) {
@@ -579,6 +585,7 @@ async function getAiStatus() {
                 dead: deadModels.has(m),
                 coolingDownFor: h.cooldownUntil > now ? Math.round((h.cooldownUntil - now) / 1000) : 0,
                 avgMs: h.avgMs,
+                avgFirstMs: h.avgFirstMs,
                 successes: h.ok,
             };
         }),

@@ -10,6 +10,7 @@ const optionSchema = new mongoose.Schema(
         name: { type: String, required: true, trim: true, maxlength: 150 },
         order: { type: Number, default: 0 },      // số nhỏ hiển thị trước
         active: { type: Boolean, default: true }, // ẩn khỏi form học sinh nhưng vẫn giữ để thống kê
+        batchId: { type: String, index: true },   // lần thêm (để "Hoàn tác" cả lần nhập)
     },
     { timestamps: true }
 );

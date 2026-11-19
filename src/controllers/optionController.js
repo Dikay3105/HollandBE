@@ -4,7 +4,35 @@ const Major = require('../models/Major');
 const Student = require('../models/Student');
 const defaultUniversities = require('../data/universities');
 
+const crypto = require('crypto');
+
 const COLLATION = { locale: 'vi', strength: 2 };
+
+/**
+ * Khoá so trùng "mềm": bỏ dấu, chữ thường, bỏ ký tự phân cách → "Tài chính - ngân hàng" ≡ "Tài chính – Ngân hàng",
+ * "Công Nghệ Thông Tin" ≡ "công nghệ thông tin".
+ */
+function matchKey(s) {
+    return String(s || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+// Câu trả lời không phải tên ngành/trường
+const JUNK = /^(chua|khong|ko|k|chua biet|khong biet|chua co|chua chon|chua xac dinh|chua nghi|chua ro|bi mat|tuy|gi cung duoc|khong co|none|no|x+|\.+|-+|\?+)$/;
+
+/** Viết hoa chữ cái đầu nếu học sinh gõ toàn chữ thường / toàn chữ hoa ("công an" → "Công an") */
+function tidyCase(name) {
+    const s = cleanName(name);
+    if (s === s.toLocaleLowerCase('vi') || (s === s.toLocaleUpperCase('vi') && s.length > 4)) {
+        const lower = s.toLocaleLowerCase('vi');
+        return lower.charAt(0).toLocaleUpperCase('vi') + lower.slice(1);
+    }
+    return s;
+}
 
 function parseType(raw) {
     return Option.TYPES.includes(raw) ? raw : null;
@@ -18,20 +46,20 @@ function cleanName(name) {
  * Thêm nhiều tên, bỏ qua tên đã tồn tại (không phân biệt hoa thường).
  * Trả về số bản ghi thêm mới.
  */
-async function insertNames(type, names) {
+async function insertNames(type, names, batchId) {
     const cleaned = [...new Set(names.map(cleanName).filter(Boolean))];
     if (!cleaned.length) return 0;
 
     const existing = await Option.find({ type }).select('name').lean();
-    const existingKeys = new Set(existing.map(o => o.name.toLocaleLowerCase('vi')));
+    const existingKeys = new Set(existing.map(o => matchKey(o.name)));
     const maxOrder = existing.length;
 
     const docs = [];
     for (const name of cleaned) {
-        const key = name.toLocaleLowerCase('vi');
-        if (existingKeys.has(key)) continue;
+        const key = matchKey(name);
+        if (!key || existingKeys.has(key)) continue;
         existingKeys.add(key);
-        docs.push({ type, name, order: maxOrder + docs.length });
+        docs.push({ type, name, order: maxOrder + docs.length, ...(batchId ? { batchId } : {}) });
     }
     if (!docs.length) return 0;
     await Option.insertMany(docs, { ordered: false });
@@ -97,11 +125,12 @@ exports.createOptions = async (req, res) => {
     if (!type) return res.status(400).json({ success: false, message: 'type không hợp lệ' });
 
     const names = Array.isArray(req.body.names) ? req.body.names : [req.body.name];
-    const inserted = await insertNames(type, names);
+    const batchId = crypto.randomUUID();
+    const inserted = await insertNames(type, names, batchId);
     if (!inserted) {
         return res.status(409).json({ success: false, message: 'Tên đã tồn tại hoặc không hợp lệ' });
     }
-    res.status(201).json({ success: true, inserted });
+    res.status(201).json({ success: true, inserted, batchId });
 };
 
 // PUT /api/admin/options/:id  { name?, active?, order? }
@@ -137,26 +166,65 @@ exports.deleteOption = async (req, res) => {
 // POST /api/admin/options/import-majors → thêm các ngành trong collection Major chưa có
 exports.importFromMajors = async (req, res) => {
     const majorNames = await Major.distinct('name');
-    const inserted = await insertNames('major', majorNames.sort((a, b) => a.localeCompare(b, 'vi')));
-    res.json({ success: true, inserted });
+    const batchId = crypto.randomUUID();
+    const inserted = await insertNames('major', majorNames.sort((a, b) => a.localeCompare(b, 'vi')), batchId);
+    res.json({ success: true, inserted, batchId });
 };
 
-// POST /api/admin/options/import-students  { type: 'major'|'university', minCount: 3 }
-// Thêm các tên học sinh đã tự nhập, xuất hiện >= minCount lần, chưa có trong danh mục
-exports.importFromStudents = async (req, res) => {
-    const type = parseType(req.body.type);
+// GET /api/admin/options/import-students/preview?type=major&minCount=3
+// Gợi ý tên học sinh đã tự nhập: gộp cách viết khác nhau (hoa/thường, dấu, gạch nối), bỏ câu trả lời rác
+// và tên đã có trong danh mục. Admin chọn rồi mới thêm (không thêm thẳng như trước).
+exports.previewFromStudents = async (req, res) => {
+    const type = parseType(req.query.type);
     if (!type) return res.status(400).json({ success: false, message: 'type không hợp lệ' });
-    const minCount = Math.max(1, parseInt(req.body.minCount, 10) || 3);
+    const minCount = Math.max(1, parseInt(req.query.minCount, 10) || 3);
 
-    const rows = await Student.aggregate([
-        { $project: { v: { $trim: { input: { $ifNull: [`$${type}`, ''] } } } } },
-        { $match: { v: { $ne: '' } } },
-        { $group: { _id: { $toLower: '$v' }, name: { $first: '$v' }, count: { $sum: 1 } } },
-        { $match: { count: { $gte: minCount } } },
-        { $sort: { count: -1 } },
+    const [students, existing] = await Promise.all([
+        Student.find({ [type]: { $nin: [null, ''] } }).select(type).lean(),
+        Option.find({ type }).select('name').lean(),
     ]);
-    const inserted = await insertNames(type, rows.map(r => r.name));
-    res.json({ success: true, inserted, candidates: rows.length });
+    const existingKeys = new Set(existing.map(o => matchKey(o.name)));
+
+    const groups = new Map(); // key -> { count, spellings: Map }
+    for (const s of students) {
+        const raw = cleanName(s[type]);
+        const key = matchKey(raw);
+        if (!key || key.length < 2 || JUNK.test(key)) continue;
+        if (!groups.has(key)) groups.set(key, { count: 0, spellings: new Map() });
+        const g = groups.get(key);
+        g.count++;
+        g.spellings.set(raw, (g.spellings.get(raw) || 0) + 1);
+    }
+
+    const candidates = [...groups.entries()]
+        .filter(([key, g]) => g.count >= minCount && !existingKeys.has(key))
+        .map(([, g]) => {
+            const spellings = [...g.spellings.entries()].sort((x, y) => y[1] - x[1]);
+            return {
+                name: tidyCase(spellings[0][0]),           // cách viết phổ biến nhất, sửa hoa/thường
+                count: g.count,
+                variants: spellings.slice(0, 4).map(([v]) => v),
+            };
+        })
+        .sort((x, y) => y.count - x.count || x.name.localeCompare(y.name, 'vi'));
+
+    res.json({ success: true, data: candidates, minCount });
+};
+
+// DELETE /api/admin/options/batch/:batchId → hoàn tác 1 lần thêm/nhập
+exports.undoBatch = async (req, res) => {
+    const batchId = String(req.params.batchId || '');
+    if (!/^[0-9a-f-]{36}$/.test(batchId)) return res.status(400).json({ success: false, message: 'batchId không hợp lệ' });
+    const r = await Option.deleteMany({ batchId });
+    res.json({ success: true, deleted: r.deletedCount });
+};
+
+// POST /api/admin/options/bulk-delete { ids: [] }
+exports.bulkDelete = async (req, res) => {
+    const ids = (Array.isArray(req.body.ids) ? req.body.ids : []).filter(id => /^[a-f0-9]{24}$/.test(id));
+    if (!ids.length) return res.status(400).json({ success: false, message: 'Chưa chọn mục nào' });
+    const r = await Option.deleteMany({ _id: { $in: ids } });
+    res.json({ success: true, deleted: r.deletedCount });
 };
 
 exports.seedOptionsIfEmpty = seedOptionsIfEmpty;

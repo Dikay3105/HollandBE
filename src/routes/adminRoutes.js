@@ -17,7 +17,9 @@ router.get('/ai-status', async (_, res) => res.json({ success: true, data: await
 router.get('/options', optionCtrl.listOptions);
 router.post('/options', optionCtrl.createOptions);
 router.post('/options/import-majors', optionCtrl.importFromMajors);
-router.post('/options/import-students', optionCtrl.importFromStudents);
+router.get('/options/import-students/preview', optionCtrl.previewFromStudents);
+router.post('/options/bulk-delete', optionCtrl.bulkDelete);
+router.delete('/options/batch/:batchId', optionCtrl.undoBatch);
 router.put('/options/:id', optionCtrl.updateOption);
 router.delete('/options/:id', optionCtrl.deleteOption);
 /* ======== Exam Block CRUD ======== */
