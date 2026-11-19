@@ -1,18 +1,8 @@
 // src/controllers/studentController.js
 const Student = require('../models/Student');
+const { broadcast } = require('../realtime');
+const { getSchoolYear, normalizeSchoolYear } = require('../utils/schoolYear');
 
-// Hàm helper tính niên khóa hiện tại (dùng nếu cần override hoặc log)
-function getCurrentSchoolYear() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1; // 1-12
-
-    if (month >= 8) {
-        return `${year}-${year + 1}`;
-    } else {
-        return `${year - 1}-${year}`;
-    }
-}
 
 /**
  * ✅ Tạo mới học sinh
@@ -38,7 +28,7 @@ exports.createStudent = async (req, res) => {
             hollandScores,
             scores,
             recommendedMajors,
-            schoolYear: schoolYear || undefined, // nếu client gửi thì dùng, không thì default schema
+            schoolYear: normalizeSchoolYear(schoolYear) || undefined, // nếu client gửi hợp lệ thì dùng, không thì default schema
         });
 
         res.status(201).json({
@@ -124,8 +114,8 @@ exports.updateStudent = async (req, res) => {
             recommendedMajors,
         };
 
-        if (schoolYear) {
-            updateData.schoolYear = schoolYear;
+        if (normalizeSchoolYear(schoolYear)) {
+            updateData.schoolYear = normalizeSchoolYear(schoolYear);
         }
 
         // Không update createdAt khi edit (trừ khi bạn cố ý muốn reset)
@@ -156,6 +146,7 @@ exports.deleteStudent = async (req, res) => {
         if (!student) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy học sinh' });
         }
+        broadcast('student:deleted', { id: String(student._id) });
         res.json({ success: true, message: 'Xóa thành công' });
     } catch (err) {
         console.error(err);
@@ -232,7 +223,7 @@ exports.searchStudents = async (req, res) => {
             total,
             page: Number(page),
             totalPages: Math.ceil(total / Number(limit)),
-            currentSchoolYear: getCurrentSchoolYear(), // optional: gửi thêm để frontend biết
+            currentSchoolYear: getSchoolYear(), // optional: gửi thêm để frontend biết
         });
     } catch (err) {
         console.error(err);

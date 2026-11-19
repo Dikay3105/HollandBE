@@ -5,8 +5,21 @@ const Major = require('../models/Major');
 const Question = require('../models/Question');
 
 const { getStats } = require('../controllers/adminController');
+const { getDetailedStats } = require('../controllers/statsController');
+const optionCtrl = require('../controllers/optionController');
+const questionCtrl = require('../controllers/questionController');
 
 router.get('/stats', getStats);
+router.get('/stats/detailed', getDetailedStats);
+router.get('/ai-status', async (_, res) => res.json({ success: true, data: await require('../helpers/aiHelper').getAiStatus() }));
+
+/* ======== Trường & ngành mong muốn (Option) CRUD ======== */
+router.get('/options', optionCtrl.listOptions);
+router.post('/options', optionCtrl.createOptions);
+router.post('/options/import-majors', optionCtrl.importFromMajors);
+router.post('/options/import-students', optionCtrl.importFromStudents);
+router.put('/options/:id', optionCtrl.updateOption);
+router.delete('/options/:id', optionCtrl.deleteOption);
 /* ======== Exam Block CRUD ======== */
 // Lấy tất cả khối thi
 router.get('/exam-blocks', async (_, res) => {
@@ -32,24 +45,10 @@ router.delete('/exam-blocks/:id', async (req, res) => {
 });
 
 /* ======== Question (Holland) CRUD ======== */
-router.get('/questions', async (_, res) => {
-    res.json(await Question.find().lean());
-});
-
-router.post('/questions', async (req, res) => {
-    const q = await Question.create(req.body);
-    res.json(q);
-});
-
-router.put('/questions/:id', async (req, res) => {
-    const q = await Question.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
-    res.json(q);
-});
-
-router.delete('/questions/:id', async (req, res) => {
-    await Question.findOneAndDelete({ id: req.params.id });
-    res.json({ success: true });
-});
+router.get('/questions', questionCtrl.listQuestions);
+router.post('/questions', questionCtrl.createQuestions);
+router.put('/questions/:id', questionCtrl.updateQuestion);
+router.delete('/questions/:id', questionCtrl.deleteQuestion);
 
 /* ======== Major CRUD ======== */
 router.get('/majors', async (_, res) => {

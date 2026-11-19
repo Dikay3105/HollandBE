@@ -2,26 +2,18 @@
 const { generateFullAdvice } = require('../helpers/aiHelper');
 const Major = require('../models/Major');
 const Student = require('../models/Student');
+const crypto = require('crypto');
+const { broadcast, sendTo } = require('../realtime');
+const { getSchoolYear, normalizeSchoolYear } = require('../utils/schoolYear');
 
-function getCurrentSchoolYear() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1; // 1-12
-
-    if (month >= 8) {
-        return `${year}-${year + 1}`;
-    } else {
-        return `${year - 1}-${year}`;
-    }
-}
 
 exports.submitResults = async (req, res) => {
     try {
         const { personalInfo, selectedBlocks, hollandScores, scores } = req.body;
-        const { name, class: studentClass, number, university, major } = personalInfo;
+        const { name, class: studentClass, number, university, major, universityOther, majorOther } = personalInfo;
 
         // 👇 Thêm schoolYear (lấy từ body, nếu ko có thì mặc định năm hiện tại)
-        const schoolYear = personalInfo.schoolYear || getCurrentSchoolYear();
+        const schoolYear = normalizeSchoolYear(personalInfo.schoolYear) || getSchoolYear();
 
         // 1️⃣ Sắp xếp nhóm theo điểm giảm dần
         const sorted = Object.entries(hollandScores || {})
@@ -117,12 +109,9 @@ exports.submitResults = async (req, res) => {
                 'Bạn không thiên hẳn về nhóm Holland nào, hãy làm lại test hoặc tham khảo ý kiến giáo viên.';
         }
 
-        const aiAdvice = await generateFullAdvice({
-            scores,
-            topMajors: uniqueMajors,
-            selectedBlocks,
-            hollandScores
-        });
+        const startedAt = new Date();
+        // Lời khuyên AI chạy nền sau khi trả kết quả → học sinh không phải chờ AI
+        const adviceJobId = crypto.randomUUID();
 
         // 7️⃣ Lưu hoặc cập nhật Student (upsert dựa trên name + class + number + schoolYear)
         const updatedStudent = await Student.findOneAndUpdate(
@@ -144,9 +133,13 @@ exports.submitResults = async (req, res) => {
                     scores: scores || [],
                     recommendedMajors: uniqueMajors || [],
                     recommendationText: recommendationText || [],
-                    advice: aiAdvice || '',
+                    advice: '',
+                    adviceStatus: 'pending',
+                    adviceJobId,
                     university: university || '',
                     major: major || '',
+                    universityOther: universityOther === true,
+                    majorOther: majorOther === true,
                     // KHÔNG set createdAt ở đây để tránh reset khi update
                     // createdAt chỉ tự động khi insert (schema default)
                 },
@@ -162,25 +155,105 @@ exports.submitResults = async (req, res) => {
             }
         );
 
-        // Optional: log để debug
-        console.log('Student upserted:', {
-            id: updatedStudent._id,
-            action: updatedStudent.createdAt.getTime() === new Date().getTime() ? 'created' : 'updated',
-            schoolYear: updatedStudent.schoolYear
-        });
+        // createdAt chỉ được set khi insert → mới hơn thời điểm bắt đầu xử lý nghĩa là bản ghi mới
+        const created = updatedStudent.createdAt >= startedAt;
+        console.log('Student upserted:', { id: updatedStudent._id, action: created ? 'created' : 'updated', schoolYear: updatedStudent.schoolYear });
 
-        // 8️⃣ Trả về
-        return res.json({
+        // Realtime: báo cho trang admin
+        broadcast('student:upserted', { created, student: updatedStudent.toObject() });
+
+        // 8️⃣ Trả về ngay (advice đang được AI viết, sẽ đẩy về qua realtime 'student:advice')
+        res.json({
             success: true,
             message: 'Kết quả đã được xử lý',
             topGroups,
             recommendedMajors: uniqueMajors,
             recommendationText,
             student: updatedStudent,
-            advice: aiAdvice
+            studentId: updatedStudent._id,
+            advice: '',
+            adviceStatus: 'pending'
+        });
+
+        // 9️⃣ Viết lời khuyên ở nền
+        generateAdviceInBackground(updatedStudent._id, adviceJobId, {
+            scores,
+            topMajors: uniqueMajors,
+            selectedBlocks,
+            hollandScores,
+            studentClass,
+            university,
+            major
         });
     } catch (err) {
         console.error(err);
-        return res.status(500).json({ success: false, message: 'Server error' });
+        if (!res.headersSent) return res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+async function generateAdviceInBackground(studentId, jobId, input) {
+    const t0 = Date.now();
+    let html = '';
+    let status = 'fallback';
+    let firstTextMs = null;
+    const topic = `student:${studentId}`;
+    try {
+        // Stream phần AI đang viết tới đúng trang của học sinh này (kênh riêng)
+        const result = await generateFullAdvice(input, {
+            onProgress: ev => {
+                if (ev.type === 'progress') sendTo(topic, 'advice:progress', { id: String(studentId), html: ev.html });
+                else sendTo(topic, 'advice:reset', { id: String(studentId) });
+            },
+        });
+        html = result.html;
+        status = result.source === 'ai' ? 'done' : 'fallback';
+        firstTextMs = result.firstTextMs || null;
+    } catch (err) {
+        console.error('Advice job lỗi:', err);
+    }
+    try {
+        // Chỉ ghi nếu vẫn là job mới nhất của học sinh này (học sinh có thể đã nộp lại)
+        const saved = await Student.findOneAndUpdate(
+            { _id: studentId, adviceJobId: jobId },
+            { $set: { advice: html, adviceStatus: status }, $unset: { adviceJobId: 1 } },
+            { new: true }
+        ).lean();
+        if (!saved) return;
+        console.log(`Advice ${status} cho ${studentId} sau ${((Date.now() - t0) / 1000).toFixed(1)}s` +
+            (firstTextMs ? ` (chữ đầu tiên sau ${(firstTextMs / 1000).toFixed(1)}s)` : ''));
+        const payload = { id: String(studentId), advice: html, adviceStatus: status };
+        sendTo(topic, 'student:advice', payload); // trang học sinh
+        broadcast('student:advice', payload);      // trang admin
+    } catch (err) {
+        console.error('Lưu advice lỗi:', err);
+    }
+}
+
+
+/**
+ * Server khởi động lại giữa lúc AI đang viết → các bản ghi còn 'pending' sẽ được viết lại (tuần tự).
+ */
+exports.resumePendingAdvice = async () => {
+    try {
+        const pending = await Student.find({ adviceStatus: 'pending' })
+            .select('scores recommendedMajors selectedBlocks hollandScores class university major')
+            .lean();
+        if (!pending.length) return;
+        console.log(`Viết lại ${pending.length} lời khuyên còn dang dở`);
+        for (const s of pending) {
+            const jobId = crypto.randomUUID();
+            await Student.updateOne({ _id: s._id }, { $set: { adviceJobId: jobId } });
+            await generateAdviceInBackground(s._id, jobId, {
+                scores: s.scores,
+                topMajors: s.recommendedMajors,
+                selectedBlocks: s.selectedBlocks,
+                hollandScores: s.hollandScores,
+                studentClass: s.class,
+                university: s.university,
+                major: s.major,
+            });
+        }
+    } catch (err) {
+        console.error('resumePendingAdvice lỗi:', err.message);
     }
 };
