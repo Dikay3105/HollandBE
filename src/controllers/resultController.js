@@ -40,28 +40,49 @@ exports.submitResults = async (req, res) => {
             groupsByScore.push({ score, types });
         }
 
-        // 3️⃣ Xác định topGroups - fix: không lấy lẻ từ bucket sau, chỉ lấy bucket fit nguyên
+        // 3️⃣ Xác định topGroups - cập nhật: cho phép tối đa 4 nhóm, không lấy lẻ bucket
         let topGroups = [];
+
         if (groupsByScore.length > 0) {
-            const maxBucket = groupsByScore[0];
-            if (maxBucket.types.length >= 4 || (groupsByScore.length === 1 && maxBucket.types.length === 6)) {
-                topGroups = [];  // discard trường hợp đặc biệt
-            } else {
-                const included = [];
-                for (let bi = 0; bi < groupsByScore.length; bi++) {
-                    const bucket = groupsByScore[bi];
-                    if (included.length + bucket.types.length > 3) {
-                        break;  // Không fit nguyên → dừng, không lấy lẻ
-                    }
-                    bucket.types.forEach(t => included.push({ type: t, score: bucket.score }));
-                    if (included.length >= 3) break;
+
+            const included = [];
+            const MIN_GROUPS = 3;
+            const MAX_GROUPS = 4;
+
+            for (let i = 0; i < groupsByScore.length; i++) {
+                const bucket = groupsByScore[i];
+
+                // nếu thêm bucket này vượt quá 4 → dừng
+                if (included.length + bucket.types.length > MAX_GROUPS) {
+                    break;
                 }
-                topGroups = included;
+
+                bucket.types.forEach(t => {
+                    included.push({ type: t, score: bucket.score });
+                });
+
+                // đã đủ ít nhất 3 nhóm
+                if (included.length >= MIN_GROUPS) {
+
+                    // nếu bucket tiếp theo cùng điểm → cho phép lên 4
+                    const nextBucket = groupsByScore[i + 1];
+
+                    if (!nextBucket || nextBucket.score !== bucket.score) {
+                        break;
+                    }
+                }
             }
+
+            topGroups = included;
         }
 
-        // Tạo chuỗi mã Holland (ví dụ: EI hoặc IE)
+        // tất cả bằng nhau → bỏ
+        if (groupsByScore.length === 1 && groupsByScore[0].types.length === 6) {
+            topGroups = [];
+        }
+
         const hollandCode = topGroups.map(g => g.type).join('');
+
         console.log("Top groups:", topGroups);
         console.log("Mã Holland:", hollandCode);
 
