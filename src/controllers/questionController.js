@@ -100,3 +100,61 @@ exports.deleteQuestion = async (req, res) => {
     await Question.deleteOne({ id });
     res.json({ success: true });
 };
+
+// POST /api/admin/questions/import  { rows: [{ id?, type, text }], dryRun }
+// Có "Mã" trùng câu đang có → cập nhật; không có mã → thêm mới (bỏ qua câu trùng nội dung trong cùng nhóm).
+exports.importQuestions = async (req, res) => {
+    const rows = Array.isArray(req.body.rows) ? req.body.rows.slice(0, 2000) : [];
+    if (!rows.length) return res.status(400).json({ success: false, message: 'File không có dòng dữ liệu nào' });
+
+    const existing = await Question.find().lean();
+    const byId = new Map(existing.map(q => [q.id, q]));
+    const keyOf = (type, text) => `${type}|${text.toLocaleLowerCase('vi')}`;
+    const keys = new Set(existing.map(q => keyOf(q.type, q.text)));
+    const finalType = new Map(existing.map(q => [q.id, q.type]));
+
+    let nextId = existing.reduce((m, q) => Math.max(m, q.id), 0) + 1;
+    const ops = [];
+    const created = [];
+    const updated = [];
+    const errors = [];
+    let unchanged = 0;
+
+    rows.forEach((row, i) => {
+        const line = `Dòng ${i + 2}`;
+        const text = cleanText(String(row?.text ?? ''));
+        const type = (String(row?.type ?? '').trim().toUpperCase().match(/^[RIASEC]/) || [])[0];
+        const id = Number(String(row?.id ?? '').trim());
+        const current = Number.isInteger(id) && id > 0 ? byId.get(id) : null;
+
+        if (current) {
+            const update = {};
+            if (text && text !== current.text) update.text = text;
+            if (type && type !== current.type) update.type = type;
+            if (update.text && (update.text.length < 3 || update.text.length > 300)) return errors.push(`${line}: câu hỏi dài từ 3 đến 300 ký tự`);
+            if (!Object.keys(update).length) return unchanged++;
+            if (update.type) finalType.set(current.id, update.type);
+            updated.push(current.id);
+            ops.push({ updateOne: { filter: { id: current.id }, update: { $set: update } } });
+            return;
+        }
+        if (!text) return errors.push(`${line}: thiếu nội dung câu hỏi`);
+        if (!type) return errors.push(`${line}: nhóm phải là một trong R, I, A, S, E, C`);
+        if (text.length < 3 || text.length > 300) return errors.push(`${line}: câu hỏi dài từ 3 đến 300 ký tự`);
+        const key = keyOf(type, text);
+        if (keys.has(key)) return unchanged++;
+        keys.add(key);
+        const newId = nextId++;
+        finalType.set(newId, type);
+        created.push(newId);
+        ops.push({ insertOne: { document: { id: newId, text, type } } });
+    });
+
+    const left = new Set(finalType.values());
+    const empty = TYPES.filter(t => !left.has(t));
+    if (empty.length) errors.push(`Sau khi nhập, nhóm ${empty.join(', ')} sẽ không còn câu hỏi nào`);
+
+    const ok = !empty.length;
+    if (!req.body.dryRun && ok && ops.length) await Question.bulkWrite(ops, { ordered: true });
+    res.json({ success: true, dryRun: !!req.body.dryRun, blocked: !ok, created: created.length, updated: updated.length, unchanged, errors: errors.slice(0, 30) });
+};

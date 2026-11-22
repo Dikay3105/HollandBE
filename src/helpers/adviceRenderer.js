@@ -118,7 +118,7 @@ ${arr(asp.alternatives).length ? `<h4>Phương án dự phòng</h4>${list(asp.al
     const majors = arr(d.majors).slice(0, 6);
     if (majors.length) {
         parts.push(section(next(), 'Ngành học phù hợp nhất', `<ol class="adv-majors">${majors.map(m => `<li class="adv-major">
-<div class="adv-major-name">${txt(m.name)}</div>
+<div class="adv-major-name">${txt(m.name)}${String(m.source || '').trim().toLowerCase() === 'ai' ? ' <span class="adv-chip adv-chip-ai">AI gợi ý thêm</span>' : ''}</div>
 ${m.reason ? `<p>${txt(m.reason)}</p>` : ''}
 <div class="adv-chips">${arr(m.blocks).map(b => `<span class="adv-chip">${esc(b)}</span>`).join('')}</div>
 ${arr(m.universities).length ? `<div class="adv-unis"><span class="adv-muted">Trường tham khảo:</span> ${arr(m.universities).map(txt).join(', ')}</div>` : ''}
@@ -152,7 +152,18 @@ ${arr(m.universities).length ? `<div class="adv-unis"><span class="adv-muted">Tr
 }
 
 /** Lời khuyên mẫu (không dùng AI) – cùng định dạng với lời khuyên AI. */
-function buildRuleBasedAdvice({ scores, majorNames, blocks, hollandScores, university, major }) {
+function buildRuleBasedAdvice({ scores, ranked = [], alternatives = [], usableBlocks = [], hollandScores, university, major }) {
+    const blocks = arr(usableBlocks).map(b => b.name);
+    const fmt = v => String(v).replace('.', ',');
+    const reason = m => {
+        const bits = [`Hợp nhóm **${arr(m.matchedGroups).join(', ')}** của bạn`];
+        const a = m.academic;
+        if (a && a.total !== null && a.total !== undefined) {
+            bits.push(`tổ hợp ${a.block} hiện đạt ${fmt(a.total)}/30${m.benchmarkScore ? `, điểm chuẩn tham khảo ~${fmt(m.benchmarkScore)}` : ''}`);
+        }
+        if (m.aspirationMatch) bits.push('trùng nguyện vọng của bạn');
+        return `${bits.join('; ')}.`;
+    };
     const top = Object.entries(hollandScores || {})
         .map(([k, v]) => [k.toUpperCase(), Number(v) || 0])
         .filter(([k, v]) => HOLLAND_INFO[k] && v > 0)
@@ -167,14 +178,23 @@ function buildRuleBasedAdvice({ scores, majorNames, blocks, hollandScores, unive
     return {
         hollandCode: top.map(t => t[0]).join(''),
         summary: top.length
-            ? `Bạn nổi trội ở nhóm **${top.map(([k]) => HOLLAND_INFO[k][0]).join(', ')}**. Khối thi đã chọn: ${arr(blocks).join(', ') || 'chưa chọn'}.`
+            ? `Bạn nổi trội ở nhóm **${top.map(([k]) => HOLLAND_INFO[k][0]).join(', ')}**. Tổ hợp bạn dùng được: ${blocks.join(', ') || 'chưa xác định'}.`
             : 'Kết quả Holland chưa thể hiện rõ nhóm nổi trội. Bạn có thể làm lại bài test hoặc trao đổi với giáo viên.',
         strengths: top.map(([k]) => `${HOLLAND_INFO[k][0]}: ${HOLLAND_INFO[k][1]}.`),
         improvements: gaps.slice(0, 3).map(g => `Môn ${g.subject}: cần tăng thêm khoảng ${fmtScore(g.gap)} điểm để đạt mục tiêu.`),
         subjectPlan: gaps.map(g => ({ subject: g.subject, advice: 'Ôn lại kiến thức nền, luyện đề định kỳ và chữa kỹ lỗi sai.' })),
         hollandAnalysis: top.length ? `Các nhóm nổi bật của bạn gợi ý những công việc phù hợp với sở thích: ${top.map(([k]) => HOLLAND_INFO[k][1]).join('; ')}.` : '',
-        aspiration: university || major ? { comment: 'Hãy tìm hiểu kỹ chương trình đào tạo, điểm chuẩn các năm gần đây và tổ hợp xét tuyển của nguyện vọng này.' } : {},
-        majors: arr(majorNames).slice(0, 6).map(name => ({ name })),
+        aspiration: university || major
+            ? {
+                comment: 'Hãy tìm hiểu kỹ chương trình đào tạo, điểm chuẩn các năm gần đây và tổ hợp xét tuyển của nguyện vọng này.',
+                alternatives: arr(alternatives).slice(0, 2).map(m => `${m.name} (cần thêm môn ${arr(m.missingSubjects).join(', ')})`),
+            }
+            : {},
+        majors: arr(ranked).slice(0, 6).map(m => ({
+            name: m.name,
+            reason: reason(m),
+            blocks: [m.academic?.block, ...arr(m.academic?.otherBlocks)].filter(Boolean).slice(0, 3),
+        })),
         admissionMethods: [
             'Xét điểm thi tốt nghiệp THPT theo tổ hợp đã chọn.',
             'Xét học bạ (điểm trung bình các năm THPT) nếu trường có áp dụng.',

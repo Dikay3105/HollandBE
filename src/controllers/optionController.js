@@ -228,3 +228,58 @@ exports.bulkDelete = async (req, res) => {
 };
 
 exports.seedOptionsIfEmpty = seedOptionsIfEmpty;
+
+// POST /api/admin/options/import  { type, rows: [{ name, active?, order? }], dryRun }
+// Khớp tên "mềm" (không dấu, không phân biệt hoa thường) → cập nhật hiển thị/thứ tự; tên mới → thêm (hoàn tác được).
+exports.importOptions = async (req, res) => {
+    const type = parseType(req.body.type);
+    if (!type) return res.status(400).json({ success: false, message: 'type không hợp lệ' });
+    const rows = Array.isArray(req.body.rows) ? req.body.rows.slice(0, 5000) : [];
+    if (!rows.length) return res.status(400).json({ success: false, message: 'File không có dòng dữ liệu nào' });
+
+    const existing = await Option.find({ type }).lean();
+    const byKey = new Map(existing.map(o => [matchKey(o.name), o]));
+    const batchId = crypto.randomUUID();
+    const ops = [];
+    const createdNames = [];
+    const errors = [];
+    let updated = 0;
+    let unchanged = 0;
+    let order = existing.length;
+
+    rows.forEach((row, i) => {
+        const name = cleanName(String(row?.name ?? ''));
+        const key = matchKey(name);
+        if (!key) return errors.push(`Dòng ${i + 2}: thiếu tên`);
+        const active = typeof row.active === 'boolean' ? row.active : undefined;
+        const ord = row.order === undefined || row.order === '' ? undefined : Number(row.order);
+        if (ord !== undefined && !Number.isFinite(ord)) return errors.push(`Dòng ${i + 2}: thứ tự phải là số`);
+
+        const found = byKey.get(key);
+        if (found) {
+            const set = {};
+            if (active !== undefined && active !== found.active) set.active = active;
+            if (ord !== undefined && ord !== found.order) set.order = ord;
+            if (!found._id || !Object.keys(set).length) return unchanged++; // !found._id: trùng dòng trước trong file
+            updated++;
+            ops.push({ updateOne: { filter: { _id: found._id }, update: { $set: set } } });
+            return;
+        }
+        const doc = { type, name, order: ord ?? order++, active: active ?? true, batchId };
+        byKey.set(key, doc);
+        createdNames.push(name);
+        ops.push({ insertOne: { document: doc } });
+    });
+
+    if (!req.body.dryRun && ops.length) await Option.bulkWrite(ops, { ordered: false });
+    res.json({
+        success: true,
+        dryRun: !!req.body.dryRun,
+        created: createdNames.length,
+        updated,
+        unchanged,
+        createdNames: createdNames.slice(0, 30),
+        errors: errors.slice(0, 30),
+        batchId: createdNames.length ? batchId : null,
+    });
+};

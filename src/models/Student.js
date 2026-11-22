@@ -16,7 +16,10 @@ const studentSchema = new mongoose.Schema({
         },
     },
 
+    // Tổ hợp học sinh dùng được (hệ thống tự suy ra từ môn thi; dữ liệu cũ: học sinh tự chọn)
     selectedBlocks: [String],
+    electiveSubjects: [String], // mã môn thi tự chọn (Subject.code)
+    aptitudeSubjects: [String], // mã môn năng khiếu dự thi
 
     hollandScores: {
         R: Number,
@@ -26,22 +29,22 @@ const studentSchema = new mongoose.Schema({
         E: Number,
         C: Number,
     },
+    topGroups: [{ _id: false, type: { type: String }, score: Number }],
+    hollandCode: { type: String, default: '' },
 
     scores: [
         {
             subject: { type: String, required: true },
+            code: String, // mã môn (Subject.code)
             currentScore: { type: Number, min: 0, max: 10 },
             targetScore: { type: Number, min: 0, max: 10 },
         },
     ],
 
-    recommendedMajors: [
-        {
-            id: String,
-            name: String,
-            description: String,
-        },
-    ],
+    // Ngành xếp hạng theo độ phù hợp (xem services/recommender.js)
+    recommendedMajors: [{ type: mongoose.Schema.Types.Mixed }],
+    // Hợp tính cách nhưng chưa có tổ hợp phù hợp (cần đổi môn / thi năng khiếu)
+    alternativeMajors: [{ type: mongoose.Schema.Types.Mixed }],
 
     recommendationText: [String],
 

@@ -14,13 +14,16 @@ const optionRoutes = require('./routes/optionRoutes');
 const { seedOptionsIfEmpty } = require('./controllers/optionController');
 const { streamHandler } = require('./realtime');
 const { resumePendingAdvice } = require('./controllers/resultController');
+const { ensureCatalog } = require('./services/catalog');
+const { getPublicConfig } = require('./controllers/catalogController');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' })); // nhập danh sách ngành từ Excel
 
 connectDB().then(async () => {
   await seedOptionsIfEmpty();
+  await ensureCatalog(); // môn học, tổ hợp, cấu hình mặc định (chỉ lần đầu) + chuyển tổ hợp cũ sang mã môn
   resumePendingAdvice(); // chạy nền
 });
 
@@ -31,6 +34,7 @@ app.use('/api/students', studentRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/options', optionRoutes);
+app.get('/api/config', getPublicConfig); // môn học, tổ hợp, số môn tự chọn cho form học sinh
 app.get('/api/realtime', streamHandler); // SSE cho trang admin
 
 app.get('/', (req, res) => res.send('Server is alive!'));

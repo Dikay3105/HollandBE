@@ -327,9 +327,10 @@ async function callModel(apiKey, model, messages, signal, onText) {
 
 /* ================= Prompt ================= */
 
-const BLOCKS_REFERENCE = 'Tổ hợp xét tuyển (2025): A00=Toán-Lý-Hóa; A01=Toán-Lý-Anh; A02=Toán-Lý-Sinh; A03=Toán-Lý-Sử; A04=Toán-Lý-Địa; A05=Toán-Hóa-Sử; A06=Toán-Hóa-Địa; A07=Toán-Sử-Địa; A08=Toán-Sử-GDKT&PL; A09=Toán-Địa-GDKT&PL; A10=Toán-Lý-GDKT&PL; A11=Toán-Hóa-GDKT&PL; B00=Toán-Hóa-Sinh; B01=Toán-Sử-Sinh; B02=Toán-Địa-Sinh; B03=Toán-Văn-Sinh; B08=Toán-Anh-Sinh; C00=Văn-Sử-Địa; C01=Văn-Toán-Lý; C02=Văn-Toán-Hóa; C03=Văn-Toán-Sử; C04=Văn-Toán-Địa; C05=Văn-Lý-Hóa; C06=Văn-Lý-Sinh; C07=Văn-Lý-Sử; C08=Văn-Hóa-Sinh; C09=Văn-Lý-Địa; C10=Văn-Hóa-Sử; C12=Văn-Sinh-Sử; C13=Văn-Sinh-Địa; C14=Văn-Toán-GDKT&PL; C16=Văn-Lý-GDKT&PL; C17=Văn-Hóa-GDKT&PL; C19=Văn-Sử-GDKT&PL; D01=Toán-Văn-Anh; D07=Toán-Hóa-Anh; D08=Toán-Sinh-Anh; D09=Toán-Anh-Sử; D10=Toán-Địa-Anh; D12=Văn-Hóa-Anh; D13=Văn-Sinh-Anh; D14=Văn-Sử-Anh; D15=Văn-Địa-Anh; D66=Văn-GDKT&PL-Anh; D84=Toán-GDKT&PL-Anh. (GDKT&PL = Giáo dục kinh tế và pháp luật)\nHolland (RIASEC): R=thực tế, kỹ thuật; I=nghiên cứu, phân tích; A=nghệ thuật, sáng tạo; S=xã hội, giúp đỡ; E=quản lý, kinh doanh; C=nghiệp vụ, quy trình.';
+const HOLLAND_REFERENCE = 'Holland (RIASEC): R=thực tế, kỹ thuật; I=nghiên cứu, phân tích; A=nghệ thuật, sáng tạo; S=xã hội, giúp đỡ; E=quản lý, kinh doanh; C=nghiệp vụ, quy trình.';
 
-const JSON_SCHEMA = `{
+function jsonSchema(region, majorSourceHint) {
+    return `{
   "hollandCode": "2-3 chữ cái nhóm nổi trội, VD: IEC",
   "summary": "2-3 câu tóm tắt hồ sơ",
   "strengths": ["3 điểm mạnh"],
@@ -337,20 +338,47 @@ const JSON_SCHEMA = `{
   "scoreOverview": "1 câu nhận xét điểm (bỏ trống nếu chưa có điểm)",
   "subjectPlan": [{ "subject": "đúng tên môn như dữ liệu", "advice": "cách học cụ thể, 1 câu" }],
   "hollandAnalysis": "2-3 câu về nhóm nổi trội và môi trường làm việc phù hợp",
-  "aspiration": { "fit": "Cao | Trung bình | Thấp", "comment": "nhận xét nguyện vọng so với Holland, điểm, khối thi", "alternatives": ["2 phương án dự phòng cụ thể"] },
-  "majors": [{ "name": "tên ngành", "reason": "1 câu vì sao phù hợp", "blocks": ["A00"], "universities": ["2 trường ở TP.HCM"] }],
+  "aspiration": { "fit": "Cao | Trung bình | Thấp", "comment": "nhận xét nguyện vọng so với Holland, điểm, tổ hợp", "alternatives": ["2 phương án dự phòng cụ thể"] },
+  "majors": [{ "name": "tên ngành", "source": "${majorSourceHint}", "reason": "1 câu vì sao phù hợp, dựa trên số liệu", "blocks": ["tổ hợp học sinh dùng được"], "universities": ["2 trường ở ${region}"] }],
   "admissionMethods": ["2-3 phương thức xét tuyển nên cân nhắc"],
   "skills": ["3-4 kỹ năng/hoạt động nên phát triển"],
   "roadmap": [{ "period": "mốc thời gian", "tasks": ["2-3 việc cụ thể"] }],
   "message": "1 câu động viên"
 }`;
+}
 
 function gradeFromClass(cls) {
     const m = String(cls || '').match(/^(\d{1,2})/);
     return m ? Number(m[1]) : null;
 }
 
-function buildPrompt({ scores, majorNames, blocks, hollandScores, studentClass, university, major }) {
+const fmt = v => String(v).replace('.', ',');
+
+/** 1 dòng mô tả ngành đã xếp hạng, có số liệu để AI giải thích (không phải tự đoán) */
+function rankedLine(m, i) {
+    const bits = [`độ phù hợp ${m.matchScore}%`, `khớp nhóm ${(m.matchedGroups || []).join(',')}`];
+    const a = m.academic;
+    if (a?.block) {
+        bits.push(a.total !== null && a.total !== undefined
+            ? `${a.block} = ${fmt(a.total)}/30${a.targetTotal ? ` (mục tiêu ${fmt(a.targetTotal)})` : ''}`
+            : `xét được bằng ${a.block}`);
+    }
+    if (m.benchmarkScore) bits.push(`điểm chuẩn tham khảo ~${fmt(m.benchmarkScore)}`);
+    if (m.aspirationMatch) bits.push('trùng nguyện vọng');
+    return `${i + 1}. ${m.name} (${bits.join('; ')})`;
+}
+
+function buildPrompt(input) {
+    const {
+        scores = [], hollandScores, studentClass, university, major, hollandCode,
+        usableBlocks = [], electiveSubjects = [], aptitudeSubjects = [], ranked = [], alternatives = [],
+    } = input;
+    const settings = input.settings || {};
+    const region = settings.region || 'TP.HCM';
+    const ai = settings.ai || {};
+    const majorCount = ai.majorCount || 6;
+    const allowExternal = ai.allowExternalMajors !== false && (ai.maxExternalMajors ?? 2) > 0;
+
     const scoreLines = scores.length
         ? scores.map(s => {
             const cur = Number(s.currentScore) || 0;
@@ -363,23 +391,34 @@ function buildPrompt({ scores, majorNames, blocks, hollandScores, studentClass, 
     const now = new Date();
     const examYear = now.getMonth() + 1 >= 8 ? now.getFullYear() + 1 : now.getFullYear();
     const today = now.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const blocksText = usableBlocks.map(b => `${b.name}=${b.subjects.join('-')}`).join('; ') || 'chưa xác định';
 
-    return `${BLOCKS_REFERENCE}
+    const majorRule = allowExternal
+        ? `"majors": đúng ${majorCount} ngành. ƯU TIÊN lấy từ "Ngành hệ thống xếp hạng" (giữ đúng tên, "source": "list"). ` +
+          `Được thêm tối đa ${ai.maxExternalMajors ?? 2} ngành NGOÀI danh sách nếu thật sự hợp Holland và tổ hợp của học sinh ("source": "ai"). ` +
+          'Chỉ ghi tổ hợp nằm trong "Tổ hợp dùng được".'
+        : `"majors": tối đa ${majorCount} ngành, CHỈ lấy từ "Ngành hệ thống xếp hạng" (giữ đúng tên, "source": "list"). Chỉ ghi tổ hợp nằm trong "Tổ hợp dùng được".`;
 
-Hôm nay: ${today}. Kỳ thi tốt nghiệp THPT gần nhất: khoảng tháng 6/${examYear}.
+    return `${HOLLAND_REFERENCE}
+
+Hôm nay: ${today}. Kỳ thi tốt nghiệp THPT gần nhất: khoảng tháng 6/${examYear} (Toán, Văn bắt buộc + môn tự chọn).
 
 Học sinh:
 - Lớp ${studentClass || '?'}${grade ? ` (khối ${grade}${grade === 12 ? ', cuối cấp' : ''})` : ''}
+- Holland: ${holland}${hollandCode ? ` → nhóm nổi trội ${hollandCode}` : ''}
+- Môn thi tự chọn: ${electiveSubjects.join(', ') || 'chưa chọn'}${aptitudeSubjects.length ? `; thi năng khiếu: ${aptitudeSubjects.join(', ')}` : ''}
+- Tổ hợp dùng được: ${blocksText}
 - Điểm (hiện tại → mục tiêu, thang 10): ${scoreLines}
-- Khối thi chọn: ${blocks.join(', ') || 'chưa chọn'}
-- Holland: ${holland}
 - Nguyện vọng: ngành "${major || 'chưa chọn'}" tại "${university || 'chưa chọn'}"
-- Ngành gợi ý theo Holland: ${majorNames.slice(0, 15).join(', ') || 'chưa có'}
 
-Yêu cầu: tiếng Việt có dấu, thân thiện, xưng "bạn", cụ thể cho học sinh THPT ở TP.HCM, NGẮN GỌN (mỗi ý ≤ 1-2 câu).
-"chưa nhập" = học sinh chưa điền điểm, KHÔNG nhận xét là điểm 0. "majors": đúng 6 ngành phù hợp nhất theo điểm hiện tại, khối thi, Holland. "roadmap": 3 mốc tính từ hôm nay. Được dùng **đậm**, không dùng HTML.
+Ngành hệ thống xếp hạng (Holland + điểm theo tổ hợp + nguyện vọng):
+${ranked.slice(0, 10).map(rankedLine).join('\n') || 'chưa có'}
+${alternatives.length ? `Hợp tính cách nhưng chưa có tổ hợp (cần đổi môn/thi năng khiếu): ${alternatives.map(m => `${m.name} (thiếu ${(m.missingSubjects || []).join(', ')})`).join('; ')}` : ''}
+
+Yêu cầu: tiếng Việt có dấu, thân thiện, xưng "bạn", cụ thể cho học sinh THPT ở ${region}, NGẮN GỌN (mỗi ý ≤ 1-2 câu).
+"chưa nhập" = học sinh chưa điền điểm, KHÔNG nhận xét là điểm 0. ${majorRule} "reason" phải dựa trên số liệu ở trên (nhóm Holland, điểm tổ hợp). "roadmap": 3 mốc tính từ hôm nay. Được dùng **đậm**, không dùng HTML.
 CHỈ trả về MỘT object JSON đúng cấu trúc:
-${JSON_SCHEMA}`;
+${jsonSchema(region, allowExternal ? 'list | ai' : 'list')}`;
 }
 
 /* ================= Hàm chính ================= */
@@ -391,24 +430,22 @@ ${JSON_SCHEMA}`;
  *   nhận HTML dựng từ phần AI đã viết (để hiện chữ dần), 'reset' khi model đang viết bị hỏng phải đổi model
  * @returns {Promise<{ html: string, source: 'ai' | 'fallback', model?: string, ms: number }>}
  */
-async function generateFullAdvice({
-    scores = [],
-    topMajors = [],
-    selectedBlocks,
-    selectedBlock,
-    hollandScores = {},
-    studentClass = '',
-    university = '',
-    major = '',
-}, { onProgress } = {}) {
+/**
+ * @param {object} raw  { scores, hollandScores, hollandCode, studentClass, university, major,
+ *                        usableBlocks, electiveSubjects, aptitudeSubjects, ranked, alternatives, settings }
+ */
+async function generateFullAdvice(raw = {}, { onProgress } = {}) {
     const t0 = Date.now();
-    scores = Array.isArray(scores) ? scores : [];
-    const blocks = Array.isArray(selectedBlocks) ? selectedBlocks : [selectedBlock].filter(Boolean);
-    const majorNames = (Array.isArray(topMajors) ? topMajors : [])
-        .map(m => (typeof m === 'string' ? m : m?.name))
-        .filter(Boolean);
+    const input = {
+        ...raw,
+        scores: Array.isArray(raw.scores) ? raw.scores : [],
+        hollandScores: raw.hollandScores || {},
+        ranked: Array.isArray(raw.ranked) ? raw.ranked : [],
+        alternatives: Array.isArray(raw.alternatives) ? raw.alternatives : [],
+        usableBlocks: Array.isArray(raw.usableBlocks) ? raw.usableBlocks : [],
+    };
+    const { scores, hollandScores, university = '', major = '' } = input;
     const ctx = { scores, hollandScores, university, major };
-    const input = { scores, majorNames, blocks, hollandScores, studentClass, university, major };
 
     const fallback = reason => {
         console.error(`AI: ${reason} → dùng lời khuyên mẫu`);

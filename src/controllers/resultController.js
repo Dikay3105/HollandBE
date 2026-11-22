@@ -1,113 +1,103 @@
 // src/controllers/resultController.js
 const { generateFullAdvice } = require('../helpers/aiHelper');
-const Major = require('../models/Major');
 const Student = require('../models/Student');
 const crypto = require('crypto');
 const { broadcast, sendTo } = require('../realtime');
 const { getSchoolYear, normalizeSchoolYear } = require('../utils/schoolYear');
+const catalogService = require('../services/catalog');
+const { recommend, scoreMap } = require('../services/recommender');
 
+// Escape ký tự đặc biệt trong regex (tránh lỗi nếu tên có . * ? ...)
+function escapeRegex(string) {
+    return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Chuẩn hoá mã môn học sinh gửi: chỉ giữ môn có thật, đúng loại, bỏ trùng */
+function pickCodes(catalog, codes, kinds, limit) {
+    const out = [];
+    for (const raw of Array.isArray(codes) ? codes : []) {
+        const s = catalog.subjectByCode.get(String(raw).toUpperCase()) || catalog.resolveSubject(raw);
+        if (s && kinds.includes(s.kind) && s.active !== false && !out.includes(s.code)) out.push(s.code);
+    }
+    return limit ? out.slice(0, limit) : out;
+}
+
+/** Điểm học sinh gửi → gắn mã môn + tên chuẩn, bỏ môn lạ, giới hạn 0–10 */
+function normalizeScores(catalog, scores) {
+    const map = scoreMap(catalog, scores);
+    const out = [];
+    for (const [code, v] of map) {
+        const s = catalog.subjectByCode.get(code);
+        out.push({ subject: s.shortName || s.name, code, currentScore: v.current ?? 0, targetScore: v.target ?? 0 });
+    }
+    return out;
+}
+
+function buildRecommendationText(result) {
+    if (!result.topGroups.length) {
+        return 'Bạn không thiên hẳn về nhóm Holland nào, hãy làm lại test hoặc tham khảo ý kiến giáo viên.';
+    }
+    if (!result.ranked.length) {
+        return result.alternatives.length
+            ? `Chưa có ngành nào vừa hợp nhóm Holland ${result.hollandCode} vừa xét tuyển được bằng môn thi bạn chọn. ` +
+              `Nếu đổi môn thi, bạn có thể cân nhắc: ${result.alternatives.map(m => m.name).join(', ')}.`
+            : `Chưa có ngành nào trong danh mục phù hợp với nhóm Holland ${result.hollandCode}. Hãy trao đổi thêm với giáo viên.`;
+    }
+    return `Ngành phù hợp nhất với bạn: ${result.ranked.map(m => `${m.name} (${m.matchScore}%)`).join(', ')}.`;
+}
+
+/** Dữ liệu cho AI viết lời khuyên (dùng lúc nộp bài và lúc server khởi động lại) */
+function adviceInput(catalog, s) {
+    return {
+        scores: s.scores || [],
+        hollandScores: s.hollandScores || {},
+        studentClass: s.class,
+        university: s.university,
+        major: s.major,
+        hollandCode: s.hollandCode || '',
+        usableBlocks: (s.selectedBlocks || []).map(n => catalog.blockByName.get(String(n).toUpperCase())).filter(Boolean)
+            .map(b => ({ name: b.name, subjects: b.subjectNames })),
+        electiveSubjects: (s.electiveSubjects || []).map(c => catalog.subjectByCode.get(c)?.name || c),
+        aptitudeSubjects: (s.aptitudeSubjects || []).map(c => catalog.subjectByCode.get(c)?.name || c),
+        ranked: s.recommendedMajors || [],
+        alternatives: s.alternativeMajors || [],
+        settings: catalog.settings,
+    };
+}
 
 exports.submitResults = async (req, res) => {
     try {
-        const { personalInfo, selectedBlocks, hollandScores, scores } = req.body;
+        const { personalInfo = {}, hollandScores, scores } = req.body;
         const { name, class: studentClass, number, university, major, universityOther, majorOther } = personalInfo;
+        if (!name || !studentClass) return res.status(400).json({ success: false, message: 'Thiếu họ tên hoặc lớp' });
 
         // 👇 Thêm schoolYear (lấy từ body, nếu ko có thì mặc định năm hiện tại)
         const schoolYear = normalizeSchoolYear(personalInfo.schoolYear) || getSchoolYear();
 
-        // 1️⃣ Sắp xếp nhóm theo điểm giảm dần
-        const sorted = Object.entries(hollandScores || {})
-            .map(([k, v]) => [k.toUpperCase(), Number(v)])
-            .sort((a, b) => b[1] - a[1]);
+        const catalog = await catalogService.load();
+        let electiveSubjects = pickCodes(catalog, req.body.electiveSubjects, ['elective'], catalog.settings.electiveCount);
+        let aptitudeSubjects = pickCodes(catalog, req.body.aptitudeSubjects, ['aptitude']);
+        const cleanScores = normalizeScores(catalog, scores);
 
-        // 2️⃣ Gom nhóm cùng điểm thành bucket
-        const groupsByScore = [];
-        for (let i = 0; i < sorted.length;) {
-            const score = sorted[i][1];
-            const types = [];
-            while (i < sorted.length && sorted[i][1] === score) {
-                types.push(sorted[i][0]);
-                i++;
-            }
-            groupsByScore.push({ score, types });
+        // Bản cũ của FE chưa gửi môn thi, chỉ gửi tổ hợp tự chọn → lấy môn từ các tổ hợp đó
+        const legacyBlocks = !electiveSubjects.length && Array.isArray(req.body.selectedBlocks) ? req.body.selectedBlocks : null;
+        if (legacyBlocks) {
+            const codes = legacyBlocks.flatMap(n => catalog.blockByName.get(String(n).toUpperCase())?.subjects || []);
+            electiveSubjects = pickCodes(catalog, codes, ['elective']);
+            aptitudeSubjects = pickCodes(catalog, codes, ['aptitude']);
         }
 
-        // 3️⃣ Xác định topGroups - cập nhật: cho phép tối đa 4 nhóm, không lấy lẻ bucket
-        let topGroups = [];
-
-        if (groupsByScore.length > 0) {
-
-            const included = [];
-            const MIN_GROUPS = 3;
-            const MAX_GROUPS = 4;
-
-            for (let i = 0; i < groupsByScore.length; i++) {
-                const bucket = groupsByScore[i];
-
-                // nếu thêm bucket này vượt quá 4 → dừng
-                if (included.length + bucket.types.length > MAX_GROUPS) {
-                    break;
-                }
-
-                bucket.types.forEach(t => {
-                    included.push({ type: t, score: bucket.score });
-                });
-
-                // đã đủ ít nhất 3 nhóm
-                if (included.length >= MIN_GROUPS) {
-
-                    // nếu bucket tiếp theo cùng điểm → cho phép lên 4
-                    const nextBucket = groupsByScore[i + 1];
-
-                    if (!nextBucket || nextBucket.score !== bucket.score) {
-                        break;
-                    }
-                }
-            }
-
-            topGroups = included;
-        }
-
-        // tất cả bằng nhau → bỏ
-        if (groupsByScore.length === 1 && groupsByScore[0].types.length === 6) {
-            topGroups = [];
-        }
-
-        const hollandCode = topGroups.map(g => g.type).join('');
-
-        console.log("Top groups:", topGroups);
-        console.log("Mã Holland:", hollandCode);
-
-        // Escape ký tự đặc biệt trong regex (tránh lỗi nếu tên có . * ? ...)
-        function escapeRegex(string) {
-            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        }
-
-        // 4️⃣ Tìm ngành phù hợp
-        const majors = topGroups.length > 0
-            ? await Major.find({
-                hollandGroups: { $in: topGroups.map(t => t.type) }
-            }).lean()
-            : [];
-
-        // 5️⃣ Loại bỏ ngành trùng
-        const uniqueMajors = [];
-        const seen = new Set();
-        for (const m of majors) {
-            if (!seen.has(m._id.toString())) {
-                seen.add(m._id.toString());
-                uniqueMajors.push(m);
-            }
-        }
-
-        // 6️⃣ Gợi ý
-        let recommendationText = uniqueMajors.length
-            ? `Ngành nghề bạn có thể lựa chọn: ${uniqueMajors.map(m => m.name).join(', ')}.`
-            : 'Hiện chưa có ngành nào phù hợp với nhóm Holland và khối thi bạn chọn.';
-        if (topGroups.length === 0) {
-            recommendationText =
-                'Bạn không thiên hẳn về nhóm Holland nào, hãy làm lại test hoặc tham khảo ý kiến giáo viên.';
-        }
+        // Xếp hạng ngành: Holland + học lực theo tổ hợp + nguyện vọng
+        const result = recommend(catalog, {
+            hollandScores,
+            electiveSubjects,
+            aptitudeSubjects,
+            scores: cleanScores,
+            aspiration: major,
+        });
+        const selectedBlocks = legacyBlocks || result.usableBlocks.map(b => b.name);
+        const recommendationText = buildRecommendationText(result);
+        console.log(`Mã Holland: ${result.hollandCode || '—'} · ${result.usableBlocks.length} tổ hợp · ${result.ranked.length} ngành`);
 
         const startedAt = new Date();
         // Lời khuyên AI chạy nền sau khi trả kết quả → học sinh không phải chờ AI
@@ -128,11 +118,16 @@ exports.submitResults = async (req, res) => {
                     class: studentClass,
                     number,
                     schoolYear,
-                    selectedBlocks: selectedBlocks || [],          // fallback nếu undefined
+                    selectedBlocks,
+                    electiveSubjects,
+                    aptitudeSubjects,
                     hollandScores: hollandScores || {},            // fallback
-                    scores: scores || [],
-                    recommendedMajors: uniqueMajors || [],
-                    recommendationText: recommendationText || [],
+                    topGroups: result.topGroups,
+                    hollandCode: result.hollandCode,
+                    scores: cleanScores,
+                    recommendedMajors: result.ranked,
+                    alternativeMajors: result.alternatives,
+                    recommendationText,
                     advice: '',
                     adviceStatus: 'pending',
                     adviceJobId,
@@ -166,8 +161,11 @@ exports.submitResults = async (req, res) => {
         res.json({
             success: true,
             message: 'Kết quả đã được xử lý',
-            topGroups,
-            recommendedMajors: uniqueMajors,
+            topGroups: result.topGroups,
+            hollandCode: result.hollandCode,
+            usableBlocks: result.usableBlocks,
+            recommendedMajors: result.ranked,
+            alternativeMajors: result.alternatives,
             recommendationText,
             student: updatedStudent,
             studentId: updatedStudent._id,
@@ -176,15 +174,7 @@ exports.submitResults = async (req, res) => {
         });
 
         // 9️⃣ Viết lời khuyên ở nền
-        generateAdviceInBackground(updatedStudent._id, adviceJobId, {
-            scores,
-            topMajors: uniqueMajors,
-            selectedBlocks,
-            hollandScores,
-            studentClass,
-            university,
-            major
-        });
+        generateAdviceInBackground(updatedStudent._id, adviceJobId, adviceInput(catalog, updatedStudent.toObject()));
     } catch (err) {
         console.error(err);
         if (!res.headersSent) return res.status(500).json({ success: false, message: 'Server error' });
@@ -236,22 +226,15 @@ async function generateAdviceInBackground(studentId, jobId, input) {
 exports.resumePendingAdvice = async () => {
     try {
         const pending = await Student.find({ adviceStatus: 'pending' })
-            .select('scores recommendedMajors selectedBlocks hollandScores class university major')
+            .select('scores recommendedMajors alternativeMajors selectedBlocks electiveSubjects aptitudeSubjects hollandScores hollandCode class university major')
             .lean();
         if (!pending.length) return;
         console.log(`Viết lại ${pending.length} lời khuyên còn dang dở`);
+        const catalog = await catalogService.load();
         for (const s of pending) {
             const jobId = crypto.randomUUID();
             await Student.updateOne({ _id: s._id }, { $set: { adviceJobId: jobId } });
-            await generateAdviceInBackground(s._id, jobId, {
-                scores: s.scores,
-                topMajors: s.recommendedMajors,
-                selectedBlocks: s.selectedBlocks,
-                hollandScores: s.hollandScores,
-                studentClass: s.class,
-                university: s.university,
-                major: s.major,
-            });
+            await generateAdviceInBackground(s._id, jobId, adviceInput(catalog, s));
         }
     } catch (err) {
         console.error('resumePendingAdvice lỗi:', err.message);
