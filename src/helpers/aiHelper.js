@@ -1,6 +1,10 @@
 // src/helpers/aiHelper.js
 // Sinh lời khuyên hướng nghiệp bằng AI – xoay vòng NHIỀU nhà cung cấp miễn phí (xem aiProviders.js):
-// Gemini → Groq → OpenRouter → Z.ai → Cloudflare → custom.
+// Gemini → Groq → OpenRouter → Z.ai → LongCat → Vercel → Cloudflare → Alibaba (quota 1 lần, để dành) → custom.
+//
+// Chịu tải: mỗi lần gọi phải "giữ lượt" (tryAcquire) theo giới hạn lượt/phút của nơi đó → nơi tốt kín lượt
+// thì chảy sang nơi kế tiếp; tất cả đều kín thì chờ lượt trống gần nhất (không rơi vào lời khuyên mẫu).
+// Hàng đợi job (services/adviceQueue.js) giới hạn số bài viết song song và ưu tiên bài mới nộp.
 //
 // Tốc độ:
 // - Model quá tải / trả JSON hỏng bị tạm nghỉ (thời gian chờ tăng dần); key/model hết quota ngày bị khoá tới lúc reset.
@@ -77,7 +81,14 @@ function classifyError(err) {
     const msg = `${err?.message || ''} ${JSON.stringify(err?.error || '')}`.toLowerCase();
     // Hết quota ngày: OpenRouter "free-models-per-day", Gemini "...PerDay...", Groq/Cerebras "tokens per day (TPD)"…
     if (status === 429 && /per[\s-]?day|perday|daily|\btpd\b|\brpd\b|quota exceeded for metric.*day/.test(msg)) return 'key-daily-limit';
+    // Alibaba: model đã dùng hết quota free (bật "Free quota only") → bỏ riêng model đó, model khác vẫn dùng được
+    if (/freetieronly|free[\s_-]?tier[\s_-]?only|free quota.*(exhaust|used up)|allocationquota/.test(msg)) return 'model-quota';
+    if (/arrearage|overdue|insufficient[\s_-]?balance/.test(msg)) return 'key-no-credit';
     if (status === 429) return 'overloaded';
+    // Tài khoản chưa gắn thẻ / phương thức thanh toán (SambaNova 402, Vercel 403) → không phải key sai
+    if (/credit card|payment method/.test(msg)) return 'key-no-credit';
+    // Model không mở cho gói free (VD Vercel free chỉ có 1 phần model) → bỏ model, KHÔNG khoá key
+    if ([400, 403].includes(status) && /model.{0,40}(not (available|allowed|supported|enabled)|requires|restricted)|not available.{0,30}(free|tier|plan)|(no|not have) access to this model/.test(msg)) return 'model-dead';
     if (status === 401 || status === 403) return 'key-invalid';
     if (status === 400 && /api[ _-]?key|invalid.*(key|token)|authentication|unauthorized/.test(msg)) return 'key-invalid'; // Google trả 400 khi key sai
     if (status === 402) return 'key-no-credit';
@@ -386,7 +397,38 @@ ${jsonSchema(region, allowExternal ? 'list | ai' : 'list')}`;
  * @param {object} raw  { scores, hollandScores, hollandCode, studentClass, university, major,
  *                        usableBlocks, electiveSubjects, aptitudeSubjects, ranked, alternatives, settings }
  */
-async function generateFullAdvice(raw = {}, { onProgress } = {}) {
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Sức chứa hiện tại: free = số lượt gửi được ngay (cộng các bucket khác nhau), waitMs = chờ tới lượt trống gần nhất.
+ * Không còn model/key nào (hết quota) → free = Infinity để job chạy luôn và nhận lời khuyên mẫu.
+ * @param {Set<string>} [skip] id "provider:model" bỏ qua
+ */
+async function capacity(skip) {
+    const cands = (await rankCandidates()).filter(c => !skip || !skip.has(c.id));
+    if (!cands.length) return { free: Infinity, waitMs: 0, none: true };
+    const buckets = new Map();
+    for (const c of cands) {
+        for (const key of providers.availableKeysFor(c.provider, c.model)) {
+            const info = providers.slotInfo(c.provider, key, c.model);
+            if (!buckets.has(info.bucket)) buckets.set(info.bucket, info);
+        }
+    }
+    let free = 0;
+    let waitMs = Infinity;
+    for (const info of buckets.values()) {
+        free += info.free;
+        if (info.free <= 0) waitMs = Math.min(waitMs, info.waitMs);
+    }
+    return { free, waitMs: free > 0 ? 0 : (Number.isFinite(waitMs) ? waitMs : 1000), none: false };
+}
+
+/**
+ * @param {object} opts
+ *   onProgress   nhận { type:'progress', html } / { type:'reset' }
+ *   allowHedge   () => boolean: có được gọi thêm luồng dự phòng không (tắt khi đông để tiết kiệm lượt)
+ */
+async function generateFullAdvice(raw = {}, { onProgress, allowHedge = () => true } = {}) {
     const t0 = Date.now();
     const input = {
         ...raw,
@@ -417,6 +459,7 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
     ];
 
     const queue = await rankCandidates();
+    const tried = new Set(); // model đã thật sự gọi trong lượt này (không thử lại)
     const deadline = t0 + TOTAL_BUDGET_MS;
     const laneControllers = { 1: new Set(), 2: new Set() };
     let winner = null;
@@ -446,12 +489,27 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
         while (!winner && Date.now() < deadline) {
             if (streamOwner !== null && streamOwner !== laneId) return null; // luồng kia đang viết
             const cand = queue.shift();
-            if (!cand) return null;
+            if (!cand) {
+                // Hết model trong hàng: nếu còn model chỉ đang kín lượt/phút → chờ lượt trống rồi thử tiếp
+                if (laneId === 2) return null; // luồng dự phòng không chờ
+                const cap = await capacity(tried);
+                if (cap.none || winner) return null;
+                const wait = cap.waitMs;
+                if (Date.now() + wait > deadline - 30 * 1000) return null; // không đủ thời gian viết nữa
+                if (wait > 0) await sleep(wait);
+                const fresh = (await rankCandidates()).filter(c => !tried.has(c.id) && !queue.some(q => q.id === c.id));
+                if (!fresh.length) return null;
+                queue.push(...fresh);
+                continue;
+            }
             const { id: model } = cand; // "provider:model" – dùng làm khoá sức khoẻ và trong log
-            if (deadModels.has(model) || health(model).cooldownUntil > Date.now()) continue;
+            if (tried.has(model) || deadModels.has(model) || health(model).cooldownUntil > Date.now()) continue;
 
             for (const key of providers.availableKeysFor(cand.provider, cand.model)) {
                 if (winner || Date.now() > deadline) return null;
+                const release = providers.tryAcquire(cand.provider, key, cand.model);
+                if (!release) continue; // key này đang kín lượt/phút → thử key khác / model khác
+                tried.add(model);
                 const ac = new AbortController();
                 laneControllers[laneId].add(ac);
                 const started = Date.now();
@@ -468,7 +526,12 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
                     emitProgress(raw);
                 };
                 try {
-                    const data = await callModel(cand, key, messages, ac.signal, onText);
+                    let data;
+                    try {
+                        data = await callModel(cand, key, messages, ac.signal, onText);
+                    } finally {
+                        release();
+                    }
                     laneControllers[laneId].delete(ac);
                     if (winner) return null;
                     winner = { data, model };
@@ -488,9 +551,21 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
                         onProgress?.({ type: 'reset' });
                     }
 
+                    if (kind === 'key-no-credit' && /payment method|credit card/i.test(err.message || '')) {
+                        // Tài khoản chưa gắn phương thức thanh toán (VD SambaNova) → mọi model đều bị từ chối, khoá cả key 1 ngày
+                        providers.blockKey(key, 24 * 60 * 60 * 1000);
+                        console.error(`AI: ${cand.provider} key ${mask(key)} đòi gắn phương thức thanh toán – bỏ qua key này 24 giờ`);
+                        break;
+                    }
                     if (kind === 'key-daily-limit' || kind === 'key-no-credit') {
                         providers.blockForDay(cand.provider, key, cand.model); // khoá theo tài khoản hoặc theo model tuỳ nhà cung cấp
                         continue; // thử key khác cùng model
+                    }
+                    if (kind === 'model-quota') {
+                        providers.blockModelForKey(key, cand.model, 30 * 24 * 60 * 60 * 1000);
+                        console.error(`AI: ${model} đã dùng hết quota free trên key ${mask(key)} – bỏ model này`);
+                        tried.delete(model);
+                        continue;
                     }
                     if (kind === 'key-invalid') {
                         providers.blockKey(key, 24 * 60 * 60 * 1000);
@@ -516,7 +591,7 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
         if (hedgeStarted) return;
         hedgeStarted = true;
         clearTimeout(hedgeTimer);
-        if (winner || streamOwner !== null) return resolveLane2(null);
+        if (winner || streamOwner !== null || !allowHedge()) return resolveLane2(null);
         lane(2).then(resolveLane2, () => resolveLane2(null));
     };
     const hedgeTimer = setTimeout(startHedge, HEDGE_DELAY_MS);
@@ -591,7 +666,12 @@ async function getAiStatus() {
         });
     }
     const missing = Object.keys(providers.PROVIDERS).filter(id => !list.some(p => p.provider === id));
-    return { totalKeys, availableKeys, providers: list, notConfigured: missing };
+    const cap = await capacity();
+    return {
+        totalKeys, availableKeys, providers: list, notConfigured: missing,
+        freeSlotsNow: Number.isFinite(cap.free) ? cap.free : null, // số lượt gửi được ngay (theo giới hạn lượt/phút)
+        queue: require('../services/adviceQueue').stats(),         // require muộn: tránh vòng phụ thuộc
+    };
 }
 
-module.exports = { generateFullAdvice, getAiStatus, parseAdviceJson, parsePartialJson, buildPrompt }; // buildPrompt: để đo/kiểm thử prompt
+module.exports = { generateFullAdvice, getAiStatus, capacity, parseAdviceJson, parsePartialJson, buildPrompt }; // buildPrompt: để đo/kiểm thử prompt

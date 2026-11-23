@@ -2,14 +2,19 @@
 // Danh sách nhà cung cấp AI (đều có API chuẩn OpenAI) + tự dò model + quản lý key/quota.
 // Thêm key vào .env là dùng được; nhà cung cấp chưa có key tự bị bỏ qua.
 //
-// Thứ tự thử mặc định (đổi bằng AI_PROVIDERS="gemini,groq,..." trong .env):
-//   Gemini → Groq → OpenRouter → Z.ai (GLM) → Cloudflare → custom
+// Thứ tự thử mặc định = chất lượng tiếng Việt từ tốt → kém (đổi bằng AI_PROVIDERS="gemini,alibaba,..." trong .env):
+//   Gemini → Groq → OpenRouter → Z.ai (GLM) → LongCat → Vercel AI Gateway → Cloudflare → Alibaba Qwen → custom
+// Mỗi nơi có giới hạn lượt/phút (rpm) + số request song song (maxInFlight): nơi tốt kín lượt thì
+// request kế tiếp tự chảy sang nơi kế tiếp thay vì bị 429 (xem tryAcquire / slotInfo).
 // (GitHub Models đã bị GitHub ngừng hoàn toàn từ 30/07/2026 nên không còn trong danh sách)
 // Mỗi nhà cung cấp có thể có nhiều key: <TÊN>_API_KEY, <TÊN>_API_KEY_2, ... (tự xoay vòng).
 const axios = require('axios');
 
 const MODEL_CACHE_MS = 6 * 60 * 60 * 1000;
-const DEFAULT_ORDER = ['gemini', 'groq', 'openrouter', 'zai', 'cloudflare', 'custom'];
+// Nguyên tắc: quota THEO NGÀY dùng trước (không dùng là mất), xếp theo chất lượng tiếng Việt;
+// rồi tới credit THEO THÁNG (Vercel); quota MỘT LẦN (Alibaba) để dành cuối cùng.
+// Cloudflare reset theo ngày nhưng Llama viết tiếng Việt kém → chỉ đứng trên Alibaba.
+const DEFAULT_ORDER = ['gemini', 'groq', 'openrouter', 'zai', 'longcat', 'vercel', 'cloudflare', 'alibaba', 'custom'];
 
 /* ================= Thời điểm reset quota ================= */
 
@@ -28,9 +33,18 @@ function nextPacificMidnight() {
     return now.getTime() + (next.getTime() - pt.getTime());
 }
 
+/** Nửa đêm giờ Bắc Kinh (UTC+8 = 23h giờ VN) */
+function nextBeijingMidnight() {
+    const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    d.setUTCHours(24, 0, 0, 0);
+    return d.getTime() - 8 * 60 * 60 * 1000;
+}
+
 /* ================= Danh sách nhà cung cấp ================= */
 // prefer: regex theo thứ tự ưu tiên (model khớp regex đứng trước được thử trước)
 // dailyScope: quota ngày tính theo 'key' (cả tài khoản) hay theo 'model' (mỗi model một hạn mức riêng)
+// rpm / rpmScope: số request/phút cho phép, tính theo 'key' hay từng 'model' (ghi đè bằng <TÊN>_RPM trong .env)
+// maxInFlight: số request chạy cùng lúc tối đa trên 1 key (0 = không giới hạn)
 
 const PROVIDERS = {
     gemini: {
@@ -46,6 +60,59 @@ const PROVIDERS = {
         reasoning: { reasoning_effort: 'none' }, // tắt "suy nghĩ" → ra chữ nhanh (model không cho tắt thì tự gọi lại không kèm)
         dailyScope: 'model',
         dailyReset: nextPacificMidnight,
+        rpm: 5, rpmScope: 'model', // free: 5 lượt/phút, 20 lượt/ngày mỗi model (AI Studio → Rate limits)
+    },
+    alibaba: {
+        // Alibaba Cloud Model Studio (vùng Singapore): ~1 triệu token free cho MỖI model, dùng trong 90 ngày.
+        // NHỚ bật "Free quota only" trong console để hết quota không bị tính tiền.
+        label: 'Alibaba Qwen (Model Studio)',
+        baseURL: () => 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+        keyEnv: 'DASHSCOPE_API_KEY',
+        defaults: ['qwen-plus', 'qwen-flash', 'qwen-turbo'],
+        discover: true,
+        prefer: [/^qwen3[\d.]*-plus$/, /^qwen-plus$/, /^qwen3[\d.]*-flash$/, /^qwen-flash$/, /^qwen-turbo$/, /^qwen3[\d.]*-max$/, /^qwen-max$/],
+        exclude: /vl|audio|omni|coder|math|embed|tts|asr|mt-|image|ocr|realtime|research|long|character|translate|\d{4}-\d{2}-\d{2}|latest|preview|thinking|instruct|-\d+b/i,
+        maxModels: 5, // mỗi model có quota free riêng → nhiều model = nhiều lượt
+        json: true,
+        reasoning: { enable_thinking: false }, // Qwen3 mặc định có thể "suy nghĩ" → tắt cho nhanh
+        dailyScope: 'model',
+        dailyReset: () => Date.now() + 60 * 60 * 1000,
+        rpm: 60, rpmScope: 'model',
+    },
+    longcat: {
+        // LongCat (Meituan) – quota token free mỗi ngày (khoảng 500k token ≈ 100 bài), reset theo giờ Bắc Kinh
+        label: 'LongCat (Meituan)',
+        baseURL: () => 'https://api.longcat.chat/openai/v1',
+        keyEnv: 'LONGCAT_API_KEY',
+        defaults: ['LongCat-Flash-Chat', 'LongCat-2.0'],
+        discover: true,
+        prefer: [/flash-chat/i, /^longcat-2\.\d+$/i, /^longcat-2/i, /flash/i],
+        exclude: /thinking|omni|audio|image|video|lite/i,
+        maxModels: 3,
+        json: true,
+        reasoning: { thinking: { type: 'disabled' } },
+        dailyScope: 'key',
+        dailyReset: nextBeijingMidnight,
+        rpm: 20, rpmScope: 'key',
+        maxInFlight: 3,
+    },
+    vercel: {
+        // Vercel AI Gateway – $5 credit free mỗi 30 ngày (KHÔNG mua credit / gắn thẻ, nếu không sẽ mất gói free).
+        // Gói free chỉ mở 1 phần model (DeepSeek, GLM bị chặn). Đo thực tế 23/11/2026:
+        //   gemini-2.5-flash-lite: chữ đầu 1s, xong 5s, ≈ $0.0007/bài → $5 ≈ 5.000–7.000 bài/tháng
+        //   gpt-oss-120b: chữ đầu 7s, xong 13s, ≈ $0.0015/bài
+        //   (qwen3.7-flash chạy được nhưng "suy nghĩ" lâu ~60s → không dùng)
+        label: 'Vercel AI Gateway',
+        baseURL: () => 'https://ai-gateway.vercel.sh/v1',
+        keyEnv: 'AI_GATEWAY_API_KEY',
+        defaults: ['google/gemini-2.5-flash-lite', 'openai/gpt-oss-120b'],
+        discover: false,
+        json: true,
+        reasoning: { reasoning_effort: 'low' },
+        reasoningOnly: /gpt-oss/,
+        dailyScope: 'key', // hết credit tháng → 402 → nghỉ tới hôm sau thử lại
+        dailyReset: nextUtcMidnight,
+        rpm: 30, rpmScope: 'key',
     },
     groq: {
         label: 'Groq',
@@ -61,6 +128,7 @@ const PROVIDERS = {
         reasoningOnly: /gpt-oss|qwen3/,
         dailyScope: 'model',
         dailyReset: () => Date.now() + 60 * 60 * 1000, // Groq tính cửa sổ trượt → thử lại sau 1 giờ
+        rpm: 30, rpmScope: 'model',
     },
     openrouter: {
         label: 'OpenRouter',
@@ -74,6 +142,7 @@ const PROVIDERS = {
         reasoning: { reasoning: { enabled: false } },
         dailyScope: 'key', // free-models-per-day tính theo tài khoản
         dailyReset: nextUtcMidnight,
+        rpm: 20, rpmScope: 'key', // 20 lượt/phút cho model :free (kể cả sau khi nạp 10 credits)
     },
     zai: {
         label: 'Z.ai (GLM)',
@@ -85,6 +154,8 @@ const PROVIDERS = {
         reasoning: { thinking: { type: 'disabled' } }, // GLM mặc định bật suy nghĩ → tắt để ra chữ nhanh
         dailyScope: 'key',
         dailyReset: () => Date.now() + 60 * 60 * 1000,
+        rpm: 30, rpmScope: 'key',
+        maxInFlight: 2, // model flash free chỉ cho vài request song song
     },
     cloudflare: {
         label: 'Cloudflare Workers AI',
@@ -97,6 +168,8 @@ const PROVIDERS = {
         json: true, // JSON mode chạy được cả khi stream (đo thực tế); không bật thì Llama hay viết sai tên trường
         dailyScope: 'key', // 10.000 neurons/ngày cho cả tài khoản
         dailyReset: nextUtcMidnight,
+        rpm: 60, rpmScope: 'key',
+        maxInFlight: 4,
     },
     custom: {
         // Bất kỳ API chuẩn OpenAI nào khác (VD Ollama tự host): AI_CUSTOM_BASE_URL, AI_CUSTOM_API_KEY, AI_CUSTOM_MODELS
@@ -155,6 +228,64 @@ function availableKeysFor(providerId, model) {
     cursors.set(providerId, c + 1);
     const start = c % keys.length;
     return [...keys.slice(start), ...keys.slice(0, start)];
+}
+
+/** Khoá riêng 1 model trên 1 key (VD Alibaba: model đó đã dùng hết quota free) */
+function blockModelForKey(key, model, ms) {
+    blockedUntil.set(`${key}|${model}`, Date.now() + ms);
+}
+
+/* ================= Giới hạn lượt/phút + song song ================= */
+// Cửa sổ trượt 60s: bucket -> [thời điểm gửi]. Đếm cả request lỗi (nhà cung cấp cũng đếm).
+
+const RPM_WINDOW_MS = 61 * 1000; // dư 1s so với cửa sổ của nhà cung cấp (đồng hồ hai bên lệch nhau vài ms)
+const sentAt = new Map();
+const inFlight = new Map();
+
+function limitsOf(providerId) {
+    const p = PROVIDERS[providerId];
+    const fromEnv = Number(process.env[`${providerId.toUpperCase()}_RPM`]);
+    return { rpm: fromEnv > 0 ? fromEnv : (p.rpm || 0), maxInFlight: p.maxInFlight || 0 };
+}
+
+const rpmBucket = (providerId, key, model) =>
+    (PROVIDERS[providerId].rpmScope === 'model' ? `${providerId}|${key}|${model}` : `${providerId}|${key}`);
+
+/** { bucket, free: số lượt gửi được ngay, waitMs: còn bao lâu thì có lượt (0 nếu đang có) } */
+function slotInfo(providerId, key, model) {
+    const { rpm, maxInFlight } = limitsOf(providerId);
+    const bucket = rpmBucket(providerId, key, model);
+    const now = Date.now();
+    let free = Infinity;
+    let waitMs = 0;
+    if (rpm) {
+        const list = (sentAt.get(bucket) || []).filter(t => now - t < RPM_WINDOW_MS);
+        sentAt.set(bucket, list);
+        free = rpm - list.length;
+        if (free <= 0) waitMs = list[0] + RPM_WINDOW_MS - now;
+    }
+    if (maxInFlight) {
+        const busy = inFlight.get(`${providerId}|${key}`) || 0;
+        free = Math.min(free, maxInFlight - busy);
+        if (busy >= maxInFlight) waitMs = Math.max(waitMs, 1000);
+    }
+    free = Math.max(0, free);
+    return { bucket, free, waitMs: free > 0 ? 0 : Math.max(waitMs, 250) };
+}
+
+/** Giữ 1 lượt nếu còn → trả về release() (gọi khi request xong), hoặc null nếu đang kín lượt */
+function tryAcquire(providerId, key, model) {
+    const info = slotInfo(providerId, key, model);
+    if (info.free <= 0) return null;
+    if (limitsOf(providerId).rpm) sentAt.get(info.bucket).push(Date.now());
+    const k = `${providerId}|${key}`;
+    inFlight.set(k, (inFlight.get(k) || 0) + 1);
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        inFlight.set(k, Math.max(0, (inFlight.get(k) || 1) - 1));
+    };
 }
 
 /* ================= Dò model ================= */
@@ -274,7 +405,10 @@ module.exports = {
     availableKeysFor,
     blockForDay,
     blockKey,
+    blockModelForKey,
     isBlocked,
+    slotInfo,
+    tryAcquire,
     requestParams,
     blockedUntil,
 };

@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { broadcast, sendTo } = require('../realtime');
 const { getSchoolYear, normalizeSchoolYear } = require('../utils/schoolYear');
 const catalogService = require('../services/catalog');
+const adviceQueue = require('../services/adviceQueue');
 const { recommend, scoreMap } = require('../services/recommender');
 
 // Escape ký tự đặc biệt trong regex (tránh lỗi nếu tên có . * ? ...)
@@ -181,7 +182,19 @@ exports.submitResults = async (req, res) => {
     }
 };
 
-async function generateAdviceInBackground(studentId, jobId, input) {
+/**
+ * Đưa bài vào hàng đợi AI (services/adviceQueue). Trả về Promise xong khi đã viết + lưu.
+ * priority: 'submit' (học sinh vừa nộp, đi trước) | 'regenerate' (admin bấm) | 'retry' (tự viết lại / khôi phục)
+ */
+function generateAdviceInBackground(studentId, jobId, input, priority = 'submit') {
+    const topic = `student:${studentId}`;
+    return adviceQueue.enqueue(opts => writeAdvice(studentId, jobId, input, opts), {
+        priority,
+        onPosition: position => sendTo(topic, 'advice:queued', { id: String(studentId), position }),
+    }).catch(err => console.error('Advice queue lỗi:', err));
+}
+
+async function writeAdvice(studentId, jobId, input, { allowHedge } = {}) {
     const t0 = Date.now();
     let html = '';
     let status = 'fallback';
@@ -190,6 +203,7 @@ async function generateAdviceInBackground(studentId, jobId, input) {
     try {
         // Stream phần AI đang viết tới đúng trang của học sinh này (kênh riêng)
         const result = await generateFullAdvice(input, {
+            allowHedge,
             onProgress: ev => {
                 if (ev.type === 'progress') sendTo(topic, 'advice:progress', { id: String(studentId), html: ev.html });
                 else sendTo(topic, 'advice:reset', { id: String(studentId) });
@@ -231,11 +245,12 @@ exports.resumePendingAdvice = async () => {
         if (!pending.length) return;
         console.log(`Viết lại ${pending.length} lời khuyên còn dang dở`);
         const catalog = await catalogService.load();
-        for (const s of pending) {
+        // Đưa hết vào hàng đợi (hàng đợi tự chia lượt cho các nhà cung cấp)
+        await Promise.all(pending.map(async s => {
             const jobId = crypto.randomUUID();
             await Student.updateOne({ _id: s._id }, { $set: { adviceJobId: jobId } });
-            await generateAdviceInBackground(s._id, jobId, adviceInput(catalog, s));
-        }
+            return generateAdviceInBackground(s._id, jobId, adviceInput(catalog, s), 'retry');
+        }));
     } catch (err) {
         console.error('resumePendingAdvice lỗi:', err.message);
     }
@@ -247,11 +262,11 @@ exports.resumePendingAdvice = async () => {
 const ADVICE_FIELDS = 'scores recommendedMajors alternativeMajors selectedBlocks electiveSubjects aptitudeSubjects hollandScores hollandCode class university major';
 
 /** Đặt học sinh về trạng thái "AI đang viết" rồi viết lại ở nền */
-async function queueRegenerate(student, catalog) {
+async function queueRegenerate(student, catalog, priority = 'retry') {
     const jobId = crypto.randomUUID();
     await Student.updateOne({ _id: student._id }, { $set: { adviceStatus: 'pending', adviceJobId: jobId } });
     broadcast('student:advice', { id: String(student._id), advice: '', adviceStatus: 'pending' });
-    return generateAdviceInBackground(student._id, jobId, adviceInput(catalog, student));
+    return generateAdviceInBackground(student._id, jobId, adviceInput(catalog, student), priority);
 }
 
 /**
@@ -286,5 +301,5 @@ exports.regenerateAdvice = async (req, res) => {
     }
     const catalog = await catalogService.load();
     res.status(202).json({ success: true, message: 'Đang tạo lại lời khuyên bằng AI' });
-    queueRegenerate(student, catalog).catch(err => console.error('regenerateAdvice lỗi:', err.message));
+    queueRegenerate(student, catalog, 'regenerate').catch(err => console.error('regenerateAdvice lỗi:', err.message));
 };
