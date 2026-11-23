@@ -1,94 +1,48 @@
 // src/helpers/aiHelper.js
-// Sinh lời khuyên hướng nghiệp qua OpenRouter.
+// Sinh lời khuyên hướng nghiệp bằng AI – xoay vòng NHIỀU nhà cung cấp miễn phí (xem aiProviders.js):
+// Gemini → Groq → Cerebras → OpenRouter → Mistral → Cloudflare → custom.
 //
 // Tốc độ:
-// - Model quá tải (429 từ nhà cung cấp) bị tạm bỏ với MỌI key, thời gian chờ tăng dần → không đốt
-//   thời gian gọi lại model đang nghẽn ở các lượt sau.
-// - Model chạy tốt gần nhất được thử trước (xếp theo độ trễ trung bình).
-// - Hedging: model đầu chưa trả lời sau HEDGE_DELAY_MS → gọi song song model kế tiếp, ai xong trước dùng.
-// - Prompt gọn, giảm suy nghĩ (reasoning effort: low) với model hỗ trợ.
+// - Model quá tải / trả JSON hỏng bị tạm nghỉ (thời gian chờ tăng dần); key/model hết quota ngày bị khoá tới lúc reset.
+// - Trong cùng nhà cung cấp, model ra chữ nhanh nhất từng chạy được thử trước.
+// - Hedging: chưa có chữ sau HEDGE_DELAY_MS → gọi song song model/nhà cung cấp kế tiếp, ai ra chữ trước thì giữ.
+// - Stream + tắt "suy nghĩ" khi được → chữ hiện sau vài giây.
 //
-// Độ bền:
-// - Danh sách model free lấy tự động từ OpenRouter (cache 6 giờ), ưu tiên AI_MODELS trong .env.
-// - Key hết quota ngày bị khoá tới 00:00 UTC; model bị gỡ (404) bị bỏ.
-// - Hết cách → lời khuyên mẫu (không dùng AI), cùng định dạng.
+// Hết cách → lời khuyên mẫu (không dùng AI), cùng định dạng; BE tự viết lại bằng AI khi có lượt.
 const OpenAI = require('openai');
-const axios = require('axios');
 const { renderAdvice, buildRuleBasedAdvice } = require('./adviceRenderer');
+const providers = require('./aiProviders');
 
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
-const MODEL_CACHE_MS = 6 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 60 * 1000;
 const TOTAL_BUDGET_MS = 110 * 1000;
 const HEDGE_DELAY_MS = 12 * 1000;
 const MODEL_COOLDOWN_BASE_MS = 60 * 1000;      // 1 phút, nhân đôi mỗi lần quá tải liên tiếp
 const MODEL_COOLDOWN_MAX_MS = 15 * 60 * 1000;  // tối đa 15 phút
 
-// Thứ tự ưu tiên mặc định (chỉ dùng nếu model còn free). Ghi đè bằng AI_MODELS="a,b,c" trong .env
-const DEFAULT_PREFERRED = [
-    'google/gemma-4-31b-it:free', // tiếng Việt tốt nhất trong nhóm free
-    'google/gemma-4-26b-a4b-it:free',
-    'nvidia/nemotron-3-ultra-550b-a55b:free',
-    'nvidia/nemotron-3.5-super-vl:free',
-    'baidu/ernie-5.5-flash-preview:free',
-];
-const FALLBACK_ROUTER = 'openrouter/free';
+const mask = key => `${key.slice(0, 8)}…${key.slice(-4)}`;
 
-/* ================= Keys ================= */
+/* ================= Sức khoẻ từng (nhà cung cấp, model) ================= */
+// id = "provider:model" → { cooldownUntil, strikes, avgMs (tổng), avgFirstMs (tới chữ đầu tiên), ok }
 
-// Lấy mọi biến OPENROUTER_API_KEY, OPENROUTER_API_KEY_1, _2, ... (không giới hạn số lượng)
-function getApiKeys() {
-    return Object.keys(process.env)
-        .filter(k => /^OPENROUTER_API_KEY(_\d+)?$/.test(k))
-        .sort((a, b) => (parseInt(a.split('_').pop(), 10) || 0) - (parseInt(b.split('_').pop(), 10) || 0))
-        .map(k => (process.env[k] || '').trim())
-        .filter(Boolean);
-}
-
-const keyBlockedUntil = new Map(); // key -> timestamp
-let keyCursor = 0;                 // xoay vòng key để chia đều quota
-
-function nextUtcMidnight() {
-    const d = new Date();
-    d.setUTCHours(24, 0, 0, 0); // quota free của OpenRouter reset 00:00 UTC (7h sáng VN)
-    return d.getTime();
-}
-
-const mask = key => `${key.slice(0, 10)}…${key.slice(-4)}`;
-
-/** Các key còn dùng được, bắt đầu từ vị trí xoay vòng. */
-function availableKeys() {
-    const keys = getApiKeys().filter(k => (keyBlockedUntil.get(k) || 0) <= Date.now());
-    if (!keys.length) return [];
-    const start = keyCursor++ % keys.length;
-    return [...keys.slice(start), ...keys.slice(0, start)];
-}
-
-/* ================= Models ================= */
-
-let modelCache = { at: 0, list: null };
-const deadModels = new Set();         // model bị gỡ / không dùng được
-const jsonCapableModels = new Set();  // hỗ trợ response_format=json_object
-const reasoningModels = new Set();    // hỗ trợ tham số reasoning
-const reasoningRequired = new Set();  // model không cho tắt reasoning
-// model -> { cooldownUntil, strikes, avgMs (tổng), avgFirstMs (tới chữ đầu tiên), ok }
+const deadModels = new Set();       // model bị gỡ / không dùng được (theo id)
+const paramDrops = new Map();       // id -> Set('reasoning'|'json'): tham số model không nhận, lần sau bỏ luôn
 const modelHealth = new Map();
 
-function health(model) {
-    if (!modelHealth.has(model)) modelHealth.set(model, { cooldownUntil: 0, strikes: 0, avgMs: null, avgFirstMs: null, ok: 0 });
-    return modelHealth.get(model);
+function health(id) {
+    if (!modelHealth.has(id)) modelHealth.set(id, { cooldownUntil: 0, strikes: 0, avgMs: null, avgFirstMs: null, ok: 0 });
+    return modelHealth.get(id);
 }
 
-function markOverloaded(model) {
-    const h = health(model);
+function markOverloaded(id) {
+    const h = health(id);
     h.strikes += 1;
     const ms = Math.min(MODEL_COOLDOWN_BASE_MS * 2 ** (h.strikes - 1), MODEL_COOLDOWN_MAX_MS);
     h.cooldownUntil = Date.now() + ms;
-    console.log(`AI: tạm bỏ ${model} ${Math.round(ms / 1000)}s (quá tải lần ${h.strikes})`);
+    console.log(`AI: tạm bỏ ${id} ${Math.round(ms / 1000)}s (lỗi lần ${h.strikes})`);
 }
 
-function markSuccess(model, ms, firstMs) {
-    const h = health(model);
+function markSuccess(id, ms, firstMs) {
+    const h = health(id);
     h.strikes = 0;
     h.cooldownUntil = 0;
     h.ok += 1;
@@ -97,72 +51,22 @@ function markSuccess(model, ms, firstMs) {
     h.avgFirstMs = h.avgFirstMs === null ? f : Math.round(h.avgFirstMs * 0.6 + f * 0.4);
 }
 
-function getPreferred() {
-    const fromEnv = (process.env.AI_MODELS || '').split(',').map(s => s.trim()).filter(Boolean);
-    return fromEnv.length ? fromEnv : DEFAULT_PREFERRED;
-}
-
-async function fetchFreeTextModels() {
-    const { data } = await axios.get(`${OPENROUTER_BASE}/models`, { timeout: 15000 });
-    return (data?.data || [])
-        .filter(m => {
-            const free = Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0;
-            const arch = m.architecture || {};
-            const textIn = (arch.input_modalities || []).includes('text');
-            const textOutOnly = JSON.stringify(arch.output_modalities || []) === '["text"]';
-            const notCodeOrTiny = !/code|coder|1\.7b|\b[1-4]b\b/i.test(m.id);
-            const ok = free && textIn && textOutOnly && notCodeOrTiny && m.id !== FALLBACK_ROUTER;
-            const params = m.supported_parameters || [];
-            if (params.includes('response_format')) jsonCapableModels.add(m.id);
-            if (params.includes('reasoning')) reasoningModels.add(m.id);
-            return ok;
-        })
-        .sort((a, b) => (b.context_length || 0) - (a.context_length || 0))
-        .map(m => m.id);
-}
-
-async function getModelList() {
-    if (modelCache.list && Date.now() - modelCache.at < MODEL_CACHE_MS) return modelCache.list;
-
-    const preferred = getPreferred();
-    let list;
-    try {
-        const available = await fetchFreeTextModels();
-        const availableSet = new Set(available);
-        const fromEnv = Boolean(process.env.AI_MODELS);
-        // Model trong AI_MODELS luôn được thử (có thể là model trả phí); model mặc định chỉ khi còn free
-        const head = preferred.filter(m => fromEnv || availableSet.has(m));
-        list = [...new Set([...head, ...available, FALLBACK_ROUTER])];
-        deadModels.clear();
-    } catch (err) {
-        console.error('Không lấy được danh sách model OpenRouter:', err.message);
-        list = [...new Set([...preferred, FALLBACK_ROUTER])];
-    }
-    modelCache = { at: Date.now(), list };
-    console.log('AI models:', list.join(', '));
-    return list;
-}
-
 /**
- * Thứ tự thử cho lượt này: bỏ model chết / đang nghỉ; model từng chạy tốt lên trước (nhanh nhất trước),
- * còn lại giữ thứ tự ưu tiên. openrouter/free luôn ở cuối.
+ * Hàng đợi cho lượt này: nhà cung cấp theo thứ tự ưu tiên (chất lượng tiếng Việt), trong mỗi nhà cung cấp
+ * model từng ra chữ nhanh đứng trước. Bỏ model chết / đang nghỉ / không còn key nào dùng được.
  */
-async function rankModels() {
-    const list = await getModelList();
+async function rankCandidates() {
+    const out = [];
     const now = Date.now();
-    const usable = list.filter(m => !deadModels.has(m) && health(m).cooldownUntil <= now);
-    // Xếp theo thời gian tới chữ đầu tiên: học sinh thấy chữ sớm quan trọng hơn tổng thời gian
-    // (VD model trả hết 1 lần sau 11s thua model stream ra chữ sau 2s dù viết xong lâu hơn)
-    const proven = usable.filter(m => m !== FALLBACK_ROUTER && health(m).avgFirstMs !== null)
-        .sort((a, b) => health(a).avgFirstMs - health(b).avgFirstMs);
-    const rest = usable.filter(m => !proven.includes(m) && m !== FALLBACK_ROUTER);
-    const ranked = [...proven, ...rest];
-    if (usable.includes(FALLBACK_ROUTER)) ranked.push(FALLBACK_ROUTER);
-    // Mọi model đều đang nghỉ → vẫn thử model nghỉ sắp hết nhất thay vì bỏ cuộc
-    if (!ranked.length) {
-        return list.filter(m => !deadModels.has(m)).sort((a, b) => health(a).cooldownUntil - health(b).cooldownUntil);
+    for (const pid of providers.activeProviders()) {
+        const models = await providers.providerModels(pid);
+        const cands = models
+            .map(model => ({ provider: pid, model, id: `${pid}:${model}` }))
+            .filter(c => !deadModels.has(c.id) && health(c.id).cooldownUntil <= now && providers.availableKeysFor(pid, c.model).length);
+        const proven = cands.filter(c => health(c.id).avgFirstMs !== null).sort((a, b) => health(a.id).avgFirstMs - health(b.id).avgFirstMs);
+        out.push(...proven, ...cands.filter(c => !proven.includes(c)));
     }
-    return ranked;
+    return out;
 }
 
 /* ================= Gọi API ================= */
@@ -171,13 +75,17 @@ function classifyError(err) {
     if (err?.name === 'AbortError' || /aborted/i.test(err?.message || '')) return 'aborted';
     const status = err?.status || err?.response?.status;
     const msg = `${err?.message || ''} ${JSON.stringify(err?.error || '')}`.toLowerCase();
-    if (status === 429 && /per-day|per day|daily/.test(msg)) return 'key-daily-limit';
+    // Hết quota ngày: OpenRouter "free-models-per-day", Gemini "...PerDay...", Groq/Cerebras "tokens per day (TPD)"…
+    if (status === 429 && /per[\s-]?day|perday|daily|\btpd\b|\brpd\b|quota exceeded for metric.*day/.test(msg)) return 'key-daily-limit';
     if (status === 429) return 'overloaded';
     if (status === 401 || status === 403) return 'key-invalid';
+    if (status === 400 && /api[ _-]?key|invalid.*(key|token)|authentication|unauthorized/.test(msg)) return 'key-invalid'; // Google trả 400 khi key sai
     if (status === 402) return 'key-no-credit';
     if (status === 404 || (status === 400 && /not a valid model|no endpoints|model/.test(msg))) return 'model-dead';
     if (status === 422) return 'bad-output';
-    return 'transient'; // timeout, 5xx, mạng...
+    if (status === 408) return 'timeout';              // treo, không ra chữ
+    if (status >= 500 && status < 600) return 'server-error'; // nhà cung cấp quá tải / lỗi (VD Gemini 503)
+    return 'transient'; // mạng chập chờn...
 }
 
 const CJK = /[぀-ヿ㐀-䶿一-鿿가-힯]/g;
@@ -191,12 +99,41 @@ function parseAdviceJson(text) {
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
     if (start < 0 || end <= start) return null;
-    try {
-        const data = JSON.parse(cleaned.slice(start, end + 1));
-        return data && typeof data === 'object' ? data : null;
-    } catch {
-        return null;
+    const body = cleaned.slice(start, end + 1);
+    // Thử nguyên văn trước, rồi bản đã sửa lỗi cú pháp hay gặp (model nhỏ như Llama trên Cloudflare hay mắc)
+    for (const candidate of [body, repairJson(body)]) {
+        try {
+            const data = JSON.parse(candidate);
+            if (data && typeof data === 'object') return data;
+        } catch { /* thử cách tiếp theo */ }
     }
+    return null;
+}
+
+/**
+ * Sửa lỗi JSON hay gặp ở output của model: ngoặc kép "cong", dấu phẩy thừa trước } ],
+ * xuống dòng / tab nằm trong chuỗi chưa escape, ký tự điều khiển lạ.
+ */
+function repairJson(s) {
+    let out = '';
+    let inStr = false;
+    let esc = false;
+    for (const ch of s.replace(/[“”]/g, '"')) {
+        if (inStr) {
+            if (esc) { esc = false; out += ch; continue; }
+            if (ch === '\\') { esc = true; out += ch; continue; }
+            if (ch === '"') { inStr = false; out += ch; continue; }
+            if (ch === '\n') { out += '\\n'; continue; }
+            if (ch === '\r') continue;
+            if (ch === '\t') { out += '\\t'; continue; }
+            if (ch < ' ') continue;
+            out += ch;
+        } else {
+            if (ch === '"') inStr = true;
+            out += ch;
+        }
+    }
+    return out.replace(/,\s*([}\]])/g, '$1');
 }
 
 /**
@@ -243,24 +180,27 @@ function parsePartialJson(text) {
     return null;
 }
 
-const IDLE_TIMEOUT_MS = 40 * 1000; // không nhận được chữ nào trong 40s → coi như treo
+const FIRST_TOKEN_TIMEOUT_MS = 25 * 1000; // chưa ra chữ đầu tiên sau 25s → coi như treo (model đang nghẽn / suy nghĩ quá lâu)
+const IDLE_TIMEOUT_MS = 40 * 1000;        // đã ra chữ nhưng im lặng quá 40s giữa chừng → treo
 
 /**
  * Gọi model dạng stream. onText(rawSoFar) được gọi mỗi khi có thêm chữ.
  * Trả về object JSON hoàn chỉnh khi model viết xong.
  */
-async function callModel(apiKey, model, messages, signal, onText) {
+async function callModel(cand, apiKey, messages, signal, onText) {
+    const { provider, model, id } = cand;
     const client = new OpenAI({
         apiKey,
-        baseURL: OPENROUTER_BASE,
+        baseURL: providers.PROVIDERS[provider].baseURL(),
         timeout: REQUEST_TIMEOUT_MS,
         maxRetries: 0, // tự xoay vòng, không để SDK retry ngầm
     });
     const params = { model, messages, max_tokens: 4000, temperature: 0.6, stream: true };
-    if (jsonCapableModels.has(model)) params.response_format = { type: 'json_object' };
-    // Tắt "suy nghĩ": đo thực tế với Nemotron Ultra, chữ đầu tiên 15s → 1s, tổng 35s → 23s.
-    // Lời khuyên dạng JSON có cấu trúc không cần suy luận sâu.
-    if (reasoningModels.has(model) && !reasoningRequired.has(model)) params.reasoning = { enabled: false };
+    // JSON mode + tắt "suy nghĩ" khi nhà cung cấp/model hỗ trợ (đo với Nemotron: chữ đầu 15s → 1s)
+    const extra = providers.requestParams(provider, model);
+    const drops = paramDrops.get(id) || new Set();
+    if (extra.response_format && !drops.has('json')) params.response_format = extra.response_format;
+    for (const k of ['reasoning', 'reasoning_effort']) if (extra[k] !== undefined && !drops.has('reasoning')) params[k] = extra[k];
 
     // Watchdog: tự huỷ nếu model im lặng quá lâu (cả trước chữ đầu tiên lẫn giữa chừng)
     const local = new AbortController();
@@ -269,9 +209,10 @@ async function callModel(apiKey, model, messages, signal, onText) {
     signal.addEventListener('abort', onOuterAbort);
     let idleTimer;
     let timedOut = false;
+    let gotText = false;
     const kick = () => {
         clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => { timedOut = true; local.abort(); }, IDLE_TIMEOUT_MS);
+        idleTimer = setTimeout(() => { timedOut = true; local.abort(); }, gotText ? IDLE_TIMEOUT_MS : FIRST_TOKEN_TIMEOUT_MS);
     };
 
     let raw = '';
@@ -279,16 +220,25 @@ async function callModel(apiKey, model, messages, signal, onText) {
     try {
         kick();
         let stream;
-        try {
-            stream = await client.chat.completions.create(params, { signal: local.signal });
-        } catch (err) {
-            // Model bắt buộc phải suy nghĩ → nhớ lại và gọi lại ngay, không kèm tham số reasoning
-            if (err?.status === 400 && params.reasoning && /reason/i.test(`${err.message} ${JSON.stringify(err.error || '')}`)) {
-                reasoningRequired.add(model);
-                delete params.reasoning;
+        // Model không nhận tham số (bắt buộc suy nghĩ / không hỗ trợ JSON mode khi stream…) → nhớ lại, gọi lại không kèm
+        for (let attempt = 0; ; attempt++) {
+            try {
                 stream = await client.chat.completions.create(params, { signal: local.signal });
-            } else {
-                throw err;
+                break;
+            } catch (err) {
+                const msg = `${err.message} ${JSON.stringify(err.error || '')}`;
+                if (err?.status !== 400 || attempt >= 2) throw err;
+                if ((params.reasoning || params.reasoning_effort) && /reason|thinking|effort/i.test(msg)) {
+                    drops.add('reasoning');
+                    delete params.reasoning;
+                    delete params.reasoning_effort;
+                } else if (params.response_format && /response_format|json/i.test(msg)) {
+                    drops.add('json');
+                    delete params.response_format;
+                } else {
+                    throw err;
+                }
+                paramDrops.set(id, drops);
             }
         }
         for await (const chunk of stream) {
@@ -297,6 +247,7 @@ async function callModel(apiKey, model, messages, signal, onText) {
             const delta = chunk.choices?.[0]?.delta?.content;
             if (!delta) continue;
             raw += delta;
+            if (!gotText) { gotText = true; kick(); }
             // Lẫn nhiều chữ Trung/Nhật/Hàn ngay từ đầu → dừng sớm, khỏi chờ hết
             if ((raw.match(CJK) || []).length > 6) {
                 throw Object.assign(new Error('Output lẫn chữ CJK'), { status: 422 });
@@ -304,7 +255,7 @@ async function callModel(apiKey, model, messages, signal, onText) {
             onText?.(raw);
         }
     } catch (err) {
-        if (timedOut) throw Object.assign(new Error(`Model im lặng quá ${IDLE_TIMEOUT_MS / 1000}s`), { status: 408 });
+        if (timedOut) throw Object.assign(new Error(gotText ? `Model ngừng giữa chừng quá ${IDLE_TIMEOUT_MS / 1000}s` : `Chưa ra chữ sau ${FIRST_TOKEN_TIMEOUT_MS / 1000}s`), { status: 408 });
         throw err;
     } finally {
         clearTimeout(idleTimer);
@@ -313,7 +264,7 @@ async function callModel(apiKey, model, messages, signal, onText) {
     // SDK có thể kết thúc vòng lặp stream ÊM khi bị huỷ (không ném lỗi) → phải tự kiểm tra,
     // nếu không sẽ tưởng model trả rỗng và phạt oan model đó
     if (local.signal.aborted) {
-        if (timedOut) throw Object.assign(new Error(`Model im lặng quá ${IDLE_TIMEOUT_MS / 1000}s`), { status: 408 });
+        if (timedOut) throw Object.assign(new Error(gotText ? `Model ngừng giữa chừng quá ${IDLE_TIMEOUT_MS / 1000}s` : `Chưa ra chữ sau ${FIRST_TOKEN_TIMEOUT_MS / 1000}s`), { status: 408 });
         throw Object.assign(new Error('Request aborted'), { name: 'AbortError' });
     }
 
@@ -445,7 +396,8 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
         usableBlocks: Array.isArray(raw.usableBlocks) ? raw.usableBlocks : [],
     };
     const { scores, hollandScores, university = '', major = '' } = input;
-    const ctx = { scores, hollandScores, university, major };
+    // hollandCode do hệ thống tính (recommender) → mọi nơi hiển thị cùng 1 mã
+    const ctx = { scores, hollandScores, university, major, hollandCode: String(input.hollandCode || '') };
 
     const fallback = reason => {
         console.error(`AI: ${reason} → dùng lời khuyên mẫu`);
@@ -456,14 +408,14 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
         };
     };
 
-    if (!getApiKeys().length) return fallback('chưa cấu hình OPENROUTER_API_KEY_*');
+    if (!providers.activeProviders().length) return fallback('chưa cấu hình key AI nào (xem BE/.env.example)');
 
     const messages = [
         { role: 'system', content: 'Bạn là chuyên gia tư vấn hướng nghiệp cho học sinh THPT Việt Nam. Luôn trả lời bằng tiếng Việt và CHỈ trả về JSON hợp lệ.' },
         { role: 'user', content: buildPrompt(input) },
     ];
 
-    const queue = await rankModels();
+    const queue = await rankCandidates();
     const deadline = t0 + TOTAL_BUDGET_MS;
     const laneControllers = { 1: new Set(), 2: new Set() };
     let winner = null;
@@ -492,11 +444,12 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
         const other = laneId === 1 ? 2 : 1;
         while (!winner && Date.now() < deadline) {
             if (streamOwner !== null && streamOwner !== laneId) return null; // luồng kia đang viết
-            const model = queue.shift();
-            if (!model) return null;
+            const cand = queue.shift();
+            if (!cand) return null;
+            const { id: model } = cand; // "provider:model" – dùng làm khoá sức khoẻ và trong log
             if (deadModels.has(model) || health(model).cooldownUntil > Date.now()) continue;
 
-            for (const key of availableKeys()) {
+            for (const key of providers.availableKeysFor(cand.provider, cand.model)) {
                 if (winner || Date.now() > deadline) return null;
                 const ac = new AbortController();
                 laneControllers[laneId].add(ac);
@@ -514,7 +467,7 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
                     emitProgress(raw);
                 };
                 try {
-                    const data = await callModel(key, model, messages, ac.signal, onText);
+                    const data = await callModel(cand, key, messages, ac.signal, onText);
                     laneControllers[laneId].delete(ac);
                     if (winner) return null;
                     winner = { data, model };
@@ -535,19 +488,20 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
                     }
 
                     if (kind === 'key-daily-limit' || kind === 'key-no-credit') {
-                        keyBlockedUntil.set(key, nextUtcMidnight());
+                        providers.blockForDay(cand.provider, key, cand.model); // khoá theo tài khoản hoặc theo model tuỳ nhà cung cấp
                         continue; // thử key khác cùng model
                     }
                     if (kind === 'key-invalid') {
-                        keyBlockedUntil.set(key, Date.now() + 24 * 60 * 60 * 1000);
+                        providers.blockKey(key, 24 * 60 * 60 * 1000);
+                        console.error(`AI: key ${cand.provider} ${mask(key)} không hợp lệ – kiểm tra lại trong .env`);
                         continue;
                     }
                     if (kind === 'model-dead') deadModels.add(model);
-                    else if (kind === 'overloaded' || kind === 'bad-output') markOverloaded(model); // nghẽn hoặc trả JSON hỏng → tạm nghỉ
+                    // nghẽn / treo / lỗi máy chủ / trả JSON hỏng → tạm nghỉ (tăng dần) để lượt sau không chờ lại model này
+                    else if (['overloaded', 'bad-output', 'timeout', 'server-error'].includes(kind)) markOverloaded(model);
                     break; // lỗi do model (quá tải / chết / output kém / timeout) → đổi model
                 }
             }
-            if (!availableKeys().length) return null; // hết key
         }
         return null;
     }
@@ -606,27 +560,37 @@ async function generateFullAdvice(raw = {}, { onProgress } = {}) {
 
 /** Trạng thái cho trang admin / debug */
 async function getAiStatus() {
-    const keys = getApiKeys();
     const now = Date.now();
-    const models = await getModelList();
-    return {
-        totalKeys: keys.length,
-        availableKeys: keys.filter(k => (keyBlockedUntil.get(k) || 0) <= now).length,
-        blockedKeys: keys
-            .filter(k => (keyBlockedUntil.get(k) || 0) > now)
-            .map(k => ({ key: mask(k), until: new Date(keyBlockedUntil.get(k)).toISOString() })),
-        models: models.map(m => {
-            const h = health(m);
-            return {
-                model: m,
-                dead: deadModels.has(m),
-                coolingDownFor: h.cooldownUntil > now ? Math.round((h.cooldownUntil - now) / 1000) : 0,
-                avgMs: h.avgMs,
-                avgFirstMs: h.avgFirstMs,
-                successes: h.ok,
-            };
-        }),
-    };
+    const list = [];
+    let totalKeys = 0;
+    let availableKeys = 0;
+    for (const pid of providers.activeProviders()) {
+        const keys = providers.providerKeys(pid);
+        const models = await providers.providerModels(pid);
+        const usableKeys = keys.filter(k => models.some(m => providers.availableKeysFor(pid, m).includes(k)));
+        totalKeys += keys.length;
+        availableKeys += usableKeys.length;
+        list.push({
+            provider: pid,
+            label: providers.PROVIDERS[pid].label,
+            keys: keys.length,
+            availableKeys: usableKeys.length,
+            models: models.map(m => {
+                const id = `${pid}:${m}`;
+                const h = health(id);
+                return {
+                    model: m,
+                    dead: deadModels.has(id),
+                    usableKeys: providers.availableKeysFor(pid, m).length,
+                    coolingDownFor: h.cooldownUntil > now ? Math.round((h.cooldownUntil - now) / 1000) : 0,
+                    avgFirstMs: h.avgFirstMs,
+                    successes: h.ok,
+                };
+            }),
+        });
+    }
+    const missing = Object.keys(providers.PROVIDERS).filter(id => !list.some(p => p.provider === id));
+    return { totalKeys, availableKeys, providers: list, notConfigured: missing };
 }
 
 module.exports = { generateFullAdvice, getAiStatus, parseAdviceJson, parsePartialJson, buildPrompt }; // buildPrompt: để đo/kiểm thử prompt

@@ -15,28 +15,40 @@ const validScore = v => {
 /* ================= Nhóm Holland nổi trội ================= */
 
 /**
- * Lấy theo từng bậc điểm (các nhóm bằng điểm đi cùng nhau, không cắt lẻ) cho tới khi đủ `min` nhóm,
- * không vượt `max`. Bậc cao nhất đã quá `max` nhóm hoặc mọi nhóm 0 điểm → không có nhóm nổi trội.
+ * Mức độ của 1 nhóm: tỉ lệ số câu đã chọn / số câu của nhóm (0–1).
+ * Không có số câu (VD gọi từ chỗ khác) → dùng điểm thô (tương đương khi các nhóm cùng số câu).
  */
-function computeTopGroups(hollandScores, { min = 3, max = 4 } = {}) {
+function groupLevel(hollandScores, type, questionCounts) {
+    const score = Number(hollandScores?.[type] ?? hollandScores?.[type.toLowerCase()]) || 0;
+    const total = Number(questionCounts?.[type]) || 0;
+    return { score, level: total > 0 ? score / total : score };
+}
+
+/**
+ * Lấy theo từng bậc (các nhóm bằng mức đi cùng nhau, không cắt lẻ) cho tới khi đủ `min` nhóm,
+ * không vượt `max`. Bậc cao nhất đã quá `max` nhóm hoặc mọi nhóm 0 điểm → không có nhóm nổi trội.
+ * So sánh theo TỈ LỆ khi biết số câu mỗi nhóm (nhóm nhiều câu hơn không được lợi); `score` trả về vẫn là điểm thô.
+ */
+function computeTopGroups(hollandScores, { min = 3, max = 4 } = {}, questionCounts = null) {
+    const key = v => Math.round(v * 10000); // so bằng an toàn với số thực
     const sorted = HOLLAND_TYPES
-        .map(t => ({ type: t, score: Number(hollandScores?.[t] ?? hollandScores?.[t.toLowerCase()]) || 0 }))
+        .map(t => ({ type: t, ...groupLevel(hollandScores, t, questionCounts) }))
         .filter(x => x.score > 0)
-        .sort((a, b) => b.score - a.score || HOLLAND_TYPES.indexOf(a.type) - HOLLAND_TYPES.indexOf(b.type));
+        .sort((a, b) => b.level - a.level || HOLLAND_TYPES.indexOf(a.type) - HOLLAND_TYPES.indexOf(b.type));
 
     const buckets = [];
     for (const item of sorted) {
         const last = buckets[buckets.length - 1];
-        if (last && last.score === item.score) last.types.push(item.type);
-        else buckets.push({ score: item.score, types: [item.type] });
+        if (last && key(last.level) === key(item.level)) last.items.push(item);
+        else buckets.push({ level: item.level, items: [item] });
     }
-    if (!buckets.length || buckets[0].types.length > max) return [];
+    if (!buckets.length || buckets[0].items.length > max) return [];
 
     const included = [];
     for (const bucket of buckets) {
         if (included.length >= min) break;
-        if (included.length + bucket.types.length > max) break;
-        bucket.types.forEach(type => included.push({ type, score: bucket.score }));
+        if (included.length + bucket.items.length > max) break;
+        bucket.items.forEach(it => included.push({ type: it.type, score: it.score }));
     }
     return included;
 }
@@ -115,10 +127,12 @@ function aspirationLevel(major, aspirationKey, aspirationField) {
  */
 function recommend(catalog, input) {
     const settings = catalog.settings;
-    const topGroups = computeTopGroups(input.hollandScores, settings.topGroups);
+    const counts = input.questionCounts || catalog.questionCounts || null;
+    const topGroups = computeTopGroups(input.hollandScores, settings.topGroups, counts);
     const topTypes = new Set(topGroups.map(g => g.type));
-    const maxHolland = Math.max(1, ...HOLLAND_TYPES.map(t => Number(input.hollandScores?.[t]) || 0));
-    const norm = t => (Number(input.hollandScores?.[t]) || 0) / maxHolland;
+    const level = t => groupLevel(input.hollandScores, t, counts).level;
+    const maxLevel = Math.max(1e-9, ...HOLLAND_TYPES.map(level));
+    const norm = t => level(t) / maxLevel;
     const profileNorm = Math.sqrt(topGroups.reduce((s, g) => s + norm(g.type) ** 2, 0)) || 1;
 
     const available = availableSubjects(catalog, input);

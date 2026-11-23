@@ -5,6 +5,7 @@ const Subject = require('../models/Subject');
 const ExamBlock = require('../models/ExamBlock');
 const Major = require('../models/Major');
 const Setting = require('../models/Setting');
+const Question = require('../models/Question');
 const { SUBJECTS, BLOCKS, DEFAULT_SETTINGS, ALIAS_MIGRATIONS, ALIAS_REMOVALS } = require('../data/catalogDefaults');
 
 const SETTINGS_KEY = 'recommendation';
@@ -154,12 +155,15 @@ function subjectResolver(subjects) {
 
 async function load() {
     if (cache && Date.now() - cacheAt < CACHE_MS) return cache;
-    const [subjects, blocks, majors, settings] = await Promise.all([
+    const [subjects, blocks, majors, settings, questionGroups] = await Promise.all([
         Subject.find().sort({ order: 1, name: 1 }).lean(),
         ExamBlock.find().sort({ name: 1 }).lean(),
         Major.find().lean(),
         getSettings(),
+        Question.aggregate([{ $group: { _id: '$type', n: { $sum: 1 } } }]),
     ]);
+    // Số câu hỏi mỗi nhóm Holland → so sánh nhóm theo tỉ lệ (admin có thể thêm/xoá câu làm các nhóm lệch số câu)
+    const questionCounts = Object.fromEntries(questionGroups.map(g => [g._id, g.n]));
     const subjectByCode = new Map(subjects.map(s => [s.code, s]));
     const enrichedBlocks = blocks.map(b => {
         const subs = (b.subjects || []).map(c => subjectByCode.get(c)).filter(Boolean);
@@ -179,6 +183,7 @@ async function load() {
         blockByName: new Map(enrichedBlocks.map(b => [b.name, b])),
         majors,
         settings,
+        questionCounts,
     };
     cacheAt = Date.now();
     return cache;

@@ -13,7 +13,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const optionRoutes = require('./routes/optionRoutes');
 const { seedOptionsIfEmpty } = require('./controllers/optionController');
 const { streamHandler } = require('./realtime');
-const { resumePendingAdvice } = require('./controllers/resultController');
+const { resumePendingAdvice, retryFallbackAdvice } = require('./controllers/resultController');
 const { ensureCatalog } = require('./services/catalog');
 const { getPublicConfig } = require('./controllers/catalogController');
 
@@ -25,6 +25,9 @@ connectDB().then(async () => {
   await seedOptionsIfEmpty();
   await ensureCatalog(); // môn học, tổ hợp, cấu hình mặc định (chỉ lần đầu) + chuyển tổ hợp cũ sang mã môn
   resumePendingAdvice(); // chạy nền
+  // Lời khuyên mẫu (AI hết quota lúc nộp bài) → tự viết lại bằng AI khi có lượt: mỗi 15 phút tối đa 10 em
+  // (dừng ngay nếu AI vẫn chưa dùng được, nên không tốn lượt vô ích)
+  setInterval(() => retryFallbackAdvice({ limit: 10 }), 15 * 60 * 1000);
 });
 
 // Routes

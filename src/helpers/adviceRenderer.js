@@ -1,3 +1,4 @@
+const { majorField, universityType } = require('../utils/fields');
 // src/helpers/adviceRenderer.js
 // Dựng HTML lời khuyên từ dữ liệu có cấu trúc (JSON của AI hoặc lời khuyên mẫu).
 // Mọi chuỗi đều được escape → không có HTML/JS lạ từ AI lọt vào trang.
@@ -32,16 +33,16 @@ function list(items, cls = 'adv-list') {
     return li ? `<ul class="${cls}">${li}</ul>` : '';
 }
 
-function section(index, title, body, key) {
+function section(index, title, body, key, badge = '') {
     if (!body || !body.trim()) return '';
-    return `<section class="adv-section" data-k="${key}"><h3 class="adv-h"><span class="adv-num">${index}</span>${esc(title)}</h3>${body}</section>`;
+    return `<section class="adv-section" data-k="${key}"><h3 class="adv-h"><span class="adv-num">${index}</span>${esc(title)}${badge}</h3>${body}</section>`;
 }
 
 const FIT_CLASS = { cao: 'adv-fit-high', 'trung bình': 'adv-fit-mid', thấp: 'adv-fit-low' };
 
 /**
  * @param {object} d   dữ liệu lời khuyên (xem schema trong aiHelper)
- * @param {object} ctx { scores, hollandScores, university, major, isFallback, streaming }
+ * @param {object} ctx { scores, hollandScores, hollandCode, university, major, isFallback, streaming }
  *   streaming = đang nhận dở từ AI (dữ liệu chưa đủ) → bỏ dòng ghi chú cuối
  */
 function renderAdvice(d, ctx = {}) {
@@ -50,7 +51,8 @@ function renderAdvice(d, ctx = {}) {
     const next = () => ++n;
 
     // --- Tổng quan ---
-    const code = String(d.hollandCode || '').toUpperCase().replace(/[^RIASEC]/g, '').slice(0, 3);
+    // Mã Holland: ưu tiên mã hệ thống đã tính (cùng quy tắc trang kết quả/PDF, theo cấu hình admin), không lấy mã AI tự viết
+    const code = String(ctx.hollandCode ?? d.hollandCode ?? '').toUpperCase().replace(/[^RIASEC]/g, '').slice(0, 6);
     if (d.summary || code) {
         parts.push(`<div class="adv-summary" data-k="summary">
 ${code ? `<div class="adv-code"><span class="adv-code-label">Mã Holland</span><span class="adv-code-value">${esc(code)}</span></div>` : ''}
@@ -117,12 +119,20 @@ ${arr(asp.alternatives).length ? `<h4>Phương án dự phòng</h4>${list(asp.al
     // --- Ngành phù hợp ---
     const majors = arr(d.majors).slice(0, 6);
     if (majors.length) {
-        parts.push(section(next(), 'Ngành học phù hợp nhất', `<ol class="adv-majors">${majors.map(m => `<li class="adv-major">
+        // Ghi rõ nguồn: AI tự đề xuất hay hệ thống xếp hạng (lời khuyên mẫu khi AI không dùng được)
+        const sourceBadge = ctx.isFallback
+            ? '<span class="adv-badge adv-badge-sys">Hệ thống gợi ý</span>'
+            : '<span class="adv-badge adv-badge-ai">✦ AI đề xuất</span>';
+        const hasAiExtra = !ctx.isFallback && majors.some(m => String(m.source || '').trim().toLowerCase() === 'ai');
+        const legend = ctx.isFallback
+            ? '<p class="adv-muted">Xếp hạng tự động theo nhóm Holland, điểm các môn và tổ hợp của bạn.</p>'
+            : `<p class="adv-muted">AI chọn từ các ngành hệ thống xếp hạng theo Holland, điểm và tổ hợp của bạn${hasAiExtra ? '; ngành có nhãn <strong>AI gợi ý thêm</strong> là ngành AI đề xuất ngoài danh sách' : ''}.</p>`;
+        parts.push(section(next(), 'Ngành học phù hợp nhất', `${legend}<ol class="adv-majors">${majors.map(m => `<li class="adv-major">
 <div class="adv-major-name">${txt(m.name)}${String(m.source || '').trim().toLowerCase() === 'ai' ? ' <span class="adv-chip adv-chip-ai">AI gợi ý thêm</span>' : ''}</div>
 ${m.reason ? `<p>${txt(m.reason)}</p>` : ''}
 <div class="adv-chips">${arr(m.blocks).map(b => `<span class="adv-chip">${esc(b)}</span>`).join('')}</div>
 ${arr(m.universities).length ? `<div class="adv-unis"><span class="adv-muted">Trường tham khảo:</span> ${arr(m.universities).map(txt).join(', ')}</div>` : ''}
-</li>`).join('')}</ol>`, 'majors'));
+</li>`).join('')}</ol>`, 'majors', sourceBadge));
     }
 
     // --- Phương thức xét tuyển ---
@@ -151,10 +161,117 @@ ${arr(m.universities).length ? `<div class="adv-unis"><span class="adv-muted">Tr
     return `<div class="adv">${parts.filter(Boolean).join('\n')}</div>`;
 }
 
-/** Lời khuyên mẫu (không dùng AI) – cùng định dạng với lời khuyên AI. */
-function buildRuleBasedAdvice({ scores, ranked = [], alternatives = [], usableBlocks = [], hollandScores, university, major }) {
+/* ================= Lời khuyên mẫu (khi AI không dùng được) ================= */
+// Không dùng AI nhưng vẫn cá nhân hoá theo: nhóm Holland đã tính, điểm từng môn (mẹo theo môn + mức chênh),
+// tổ hợp/môn năng khiếu, nguyện vọng, lớp đang học.
+
+const plainVi = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+
+// Mẹo theo môn: [cơ bản – khi cần tăng nhiều, nâng cao – khi gần đạt]
+const SUBJECT_TIPS = [
+    [/toan/, 'củng cố lại hàm số, lượng giác, hình học lớp 10–11; làm chắc câu nhận biết – thông hiểu trước khi luyện vận dụng',
+        'mỗi tuần 1 đề thi thử bấm giờ 90 phút, ghi sổ lỗi sai và luyện thêm câu vận dụng cao'],
+    [/van|ngu van/, 'luyện dàn ý nghị luận xã hội và nghị luận văn học, đọc mẫu bài hay rồi tự viết lại theo ý mình',
+        'mỗi tuần viết 1 bài hoàn chỉnh trong thời gian thi, nhờ thầy cô chấm và sửa diễn đạt'],
+    [/anh|tieng anh|ngoai ngu/, 'học 15–20 từ vựng/ngày theo chủ đề, ôn lại các thì và cấu trúc ngữ pháp hay gặp trong đề',
+        'luyện đề đọc hiểu – điền từ có bấm giờ; cân nhắc thi IELTS để được quy đổi điểm/ưu tiên xét tuyển'],
+    [/vat ly|^ly$| ly$/, 'tóm tắt công thức từng chương và làm lại các dạng bài cơ bản cho thật chắc',
+        'luyện dạng bài tổng hợp, đồ thị và câu hỏi thí nghiệm; làm đề bấm giờ để tăng tốc độ'],
+    [/hoa/, 'ôn phương trình phản ứng, tính chất chất vô cơ – hữu cơ và các công thức tính toán cơ bản',
+        'luyện bài tập tính toán nhiều bước và câu hỏi thực nghiệm; làm sơ đồ chuỗi phản ứng để nhớ lâu'],
+    [/sinh/, 'vẽ sơ đồ tư duy từng chương (di truyền, sinh thái, cơ thể) và học thuộc khái niệm cốt lõi',
+        'luyện bài tập di truyền và câu hỏi phân tích số liệu thí nghiệm'],
+    [/su|lich su/, 'lập trục thời gian cho từng giai đoạn, học theo sự kiện – nguyên nhân – ý nghĩa',
+        'luyện câu hỏi so sánh, liên hệ và đề thi thử để quen cách hỏi mới'],
+    [/dia/, 'ôn kiến thức theo vùng kinh tế, luyện đọc Atlat và nhận dạng biểu đồ',
+        'luyện kỹ năng xử lý số liệu, vẽ – nhận xét biểu đồ và đề thi thử bấm giờ'],
+    [/kinh te|phap luat|gdcd|gdkt/, 'học theo tình huống thực tế, ghi nhớ các khái niệm và quyền – nghĩa vụ công dân',
+        'luyện câu hỏi tình huống pháp luật – kinh tế trong đề thi thử'],
+    [/tin|tin hoc/, 'ôn lại thuật toán cơ bản và luyện viết chương trình nhỏ mỗi ngày',
+        'luyện đề lập trình có giới hạn thời gian và bài toán tối ưu'],
+    [/cong nghe/, 'ôn kiến thức trọng tâm theo chủ đề và hiểu nguyên lý thay vì học thuộc',
+        'luyện câu hỏi ứng dụng thực tế và đề thi thử'],
+    [/nang khieu|ve|hinh hoa|trang tri|hat|thanh nhac|mam non|the duc|the thao|nhac|mua|bieu dien|dien vien/,
+        'luyện năng khiếu đều đặn mỗi ngày, tìm hiểu đề mẫu và tiêu chí chấm của trường bạn nhắm tới',
+        'tham gia lớp luyện thi năng khiếu và thi thử để quen áp lực phòng thi'],
+];
+
+function subjectTip(subject, cur, gap) {
+    const key = plainVi(subject);
+    const found = SUBJECT_TIPS.find(([re]) => re.test(key));
+    const [basic, advanced] = found ? [found[1], found[2]] : ['ôn lại kiến thức nền theo từng chương', 'luyện đề định kỳ và chữa kỹ lỗi sai'];
+    if (cur === null) return `Nhập điểm hiện tại để có lộ trình sát hơn; trước mắt nên ${basic}.`;
+    if (gap <= 0) return `Đã đạt mục tiêu – giữ phong độ: ${advanced}.`;
+    const months = Math.ceil(gap / 0.5);
+    const plan = gap >= 2 ? `${basic}. Cần tăng ${fmtScore(gap)} điểm – đặt mốc khoảng +0,5 điểm/tháng (≈${months} tháng)`
+        : gap >= 1 ? `${basic}, sau đó ${advanced}`
+            : advanced;
+    return plan.charAt(0).toUpperCase() + plan.slice(1) + '.';
+}
+
+const GROUP_SKILLS = {
+    R: 'Tham gia CLB kỹ thuật/robotics, tự làm mô hình hoặc sửa chữa đồ dùng để rèn kỹ năng thực hành.',
+    I: 'Tham gia CLB khoa học, cuộc thi nghiên cứu khoa học kỹ thuật; đọc thêm sách và tài liệu chuyên ngành.',
+    A: 'Xây dựng portfolio sáng tạo (vẽ, thiết kế, viết, quay dựng) – rất có lợi khi xét tuyển ngành nghệ thuật.',
+    S: 'Tham gia tình nguyện, hoạt động Đoàn – Hội, kèm bạn học để rèn giao tiếp và kỹ năng hỗ trợ người khác.',
+    E: 'Nhận vai trò cán sự lớp, tổ chức sự kiện, luyện thuyết trình trước đám đông.',
+    C: 'Luyện tin học văn phòng (Excel, Word), tự lập kế hoạch học tập và quản lý thời gian chi tiết.',
+};
+
+const GROUP_MESSAGE = {
+    R: 'Bạn mạnh ở làm thật, thấy kết quả thật – hãy biến mỗi buổi ôn tập thành một "sản phẩm" nhỏ hoàn thành mỗi ngày.',
+    I: 'Sự tò mò là lợi thế lớn của bạn – đặt câu hỏi "vì sao" cho từng bài học, điểm số sẽ đến theo.',
+    A: 'Sáng tạo của bạn cần một kế hoạch đủ chắc – giữ đam mê và kỷ luật song song, bạn sẽ đi rất xa.',
+    S: 'Bạn giỏi kết nối và giúp đỡ người khác – học nhóm và dạy lại cho bạn bè sẽ giúp bạn nhớ bài lâu hơn.',
+    E: 'Bạn có tố chất dẫn dắt – hãy đặt mục tiêu rõ ràng cho từng tuần và tự "quản lý dự án" việc học của mình.',
+    C: 'Sự cẩn thận và ngăn nắp là điểm mạnh – một lịch ôn tập chi tiết sẽ giúp bạn về đích đúng hẹn.',
+};
+
+function gradeOf(cls) {
+    const m = String(cls || '').match(/^(\d{1,2})/);
+    return m ? Number(m[1]) : null;
+}
+
+function roadmapFor(grade) {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const examYear = month >= 8 ? year + 1 : year;
+    if (grade === 12) {
+        return [
+            { period: `Từ nay đến hết học kỳ 1 (tháng 1/${examYear})`, tasks: ['Hệ thống lại kiến thức nền các môn trong tổ hợp', 'Chốt danh sách 3–5 ngành/trường mục tiêu và phương thức xét tuyển'] },
+            { period: `Tháng 2 – 5/${examYear}`, tasks: ['Luyện đề thi thử hằng tuần, theo dõi điểm từng môn', 'Nộp hồ sơ các phương thức xét tuyển sớm (học bạ, năng lực, chứng chỉ) nếu có'] },
+            { period: `Tháng 6 – 8/${examYear}`, tasks: ['Thi tốt nghiệp THPT, giữ sức khoẻ và tâm lý ổn định', 'So sánh điểm với điểm chuẩn, điều chỉnh nguyện vọng hợp lý'] },
+        ];
+    }
+    const yearsLeft = grade === 10 ? 2 : grade === 11 ? 1 : null;
+    return [
+        { period: 'Học kỳ này', tasks: ['Giữ điểm trung bình các môn trong tổ hợp ở mức cao (học bạ được dùng để xét tuyển)', 'Tìm hiểu kỹ ngành và trường mình quan tâm'] },
+        { period: yearsLeft === 2 ? 'Hè và năm lớp 11' : 'Hè trước lớp 12', tasks: ['Tham gia hoạt động ngoại khoá/CLB phù hợp nhóm Holland', 'Bắt đầu luyện chứng chỉ (IELTS, tin học) nếu ngành yêu cầu'] },
+        { period: `Năm lớp 12 (thi tháng 6/${examYear + (yearsLeft || 0)})`, tasks: ['Luyện đề thi thử theo tổ hợp đã chọn', 'Chốt nguyện vọng và chuẩn bị hồ sơ xét tuyển'] },
+    ];
+}
+
+function buildRuleBasedAdvice({
+    scores, ranked = [], alternatives = [], usableBlocks = [], hollandScores, hollandCode = '',
+    university, major, studentClass, aptitudeSubjects = [],
+}) {
     const blocks = arr(usableBlocks).map(b => b.name);
     const fmt = v => String(v).replace('.', ',');
+    // Mã Holland: dùng đúng mã hệ thống đã tính (cùng quy tắc với trang kết quả, theo cấu hình admin)
+    const codes = String(hollandCode || '').toUpperCase().split('').filter(k => HOLLAND_INFO[k]);
+    const groupNames = codes.map(k => HOLLAND_INFO[k][0]);
+
+    const subjectRows = arr(scores).map(s => {
+        const cur = num(s.currentScore);
+        const tgt = num(s.targetScore);
+        return { subject: s.subject, cur, tgt, gap: cur !== null && tgt !== null ? Math.round((tgt - cur) * 100) / 100 : 0 };
+    });
+    const withScore = subjectRows.filter(r => r.cur !== null);
+    const strong = withScore.filter(r => r.cur >= 8).sort((a, b) => b.cur - a.cur);
+    const gaps = withScore.filter(r => r.gap > 0).sort((a, b) => b.gap - a.gap);
+    const avg = withScore.length ? withScore.reduce((a, r) => a + r.cur, 0) / withScore.length : null;
+
     const reason = m => {
         const bits = [`Hợp nhóm **${arr(m.matchedGroups).join(', ')}** của bạn`];
         const a = m.academic;
@@ -164,30 +281,66 @@ function buildRuleBasedAdvice({ scores, ranked = [], alternatives = [], usableBl
         if (m.aspirationMatch) bits.push('trùng nguyện vọng của bạn');
         return `${bits.join('; ')}.`;
     };
-    const top = Object.entries(hollandScores || {})
-        .map(([k, v]) => [k.toUpperCase(), Number(v) || 0])
-        .filter(([k, v]) => HOLLAND_INFO[k] && v > 0)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3);
 
-    const gaps = arr(scores)
-        .map(s => ({ subject: s.subject, gap: (num(s.targetScore) ?? 0) - (num(s.currentScore) ?? 0), cur: num(s.currentScore) }))
-        .filter(s => s.cur !== null && s.gap > 0)
-        .sort((a, b) => b.gap - a.gap);
+    // Nguyện vọng: có trong danh sách ngành phù hợp? cùng lĩnh vực?
+    const aspMatch = arr(ranked).find(m => m.aspirationMatch);
+    const aspField = major ? majorField(major) : '';
+    const sameField = aspField && arr(ranked).some(m => majorField(m.name) === aspField);
+    const fit = !major ? '' : aspMatch ? 'Cao' : sameField ? 'Trung bình' : 'Thấp';
+    const aspComment = !major && !university ? ''
+        : aspMatch ? `Nguyện vọng **${major}** nằm trong danh sách ngành phù hợp với nhóm Holland và tổ hợp của bạn – hãy giữ hướng này và tập trung nâng điểm.`
+            : sameField ? `Ngành **${major}** cùng lĩnh vực ${aspField} với các ngành phù hợp của bạn, nhưng chưa phải lựa chọn sát nhất – nên tìm hiểu kỹ chương trình đào tạo và so sánh với các ngành gợi ý bên dưới.`
+                : major ? `Ngành **${major}** chưa khớp rõ với nhóm Holland ${codes.join('') || ''} và tổ hợp hiện tại. Hãy tìm hiểu thực tế công việc, tham khảo thầy cô và cân nhắc thêm các ngành gợi ý bên dưới.`
+                    : `Bạn đã chọn trường **${university}** – hãy xác định thêm ngành cụ thể để có lời khuyên sát hơn.`;
+
+    // Phương thức xét tuyển theo hồ sơ
+    const methods = [`Xét điểm thi tốt nghiệp THPT${blocks.length ? ` theo tổ hợp ${blocks.slice(0, 4).join(', ')}` : ''}.`];
+    if (avg !== null && avg >= 7.5) methods.push(`Xét học bạ: điểm hiện tại trung bình ~${fmtScore(Math.round(avg * 10) / 10)} – giữ ổn định các học kỳ còn lại để có lợi thế.`);
+    else methods.push('Xét học bạ nếu trường có áp dụng – cần cải thiện điểm trung bình các môn trong tổ hợp.');
+    const uniType = university ? universityType(university) : '';
+    if (uniType === 'ĐHQG-HCM') methods.push('Kỳ thi Đánh giá năng lực ĐHQG-HCM – phương thức quan trọng của các trường thành viên ĐHQG.');
+    else methods.push('Kỳ thi Đánh giá năng lực ĐHQG-HCM (nhiều trường ngoài ĐHQG cũng sử dụng kết quả này).');
+    const eng = subjectRows.find(r => /anh/.test(plainVi(r.subject)));
+    if (eng && ((eng.tgt ?? 0) >= 8 || (eng.cur ?? 0) >= 7.5)) methods.push('Chứng chỉ IELTS (từ 5.5–6.0) để quy đổi điểm Tiếng Anh hoặc được ưu tiên xét tuyển.');
+    if (arr(aptitudeSubjects).length) methods.push(`Thi năng khiếu (${arr(aptitudeSubjects).join(', ')}) theo lịch riêng của từng trường – nên đăng ký sớm.`);
+    if (uniType === 'Quân đội – Công an') methods.push('Đăng ký sơ tuyển (sức khoẻ, lý lịch) tại địa phương trước hạn quy định.');
+
+    const strengths = [
+        ...codes.slice(0, 3).map(k => `Nhóm **${HOLLAND_INFO[k][0]}**: ${HOLLAND_INFO[k][1]}.`),
+        strong.length ? `Học lực tốt ở ${strong.slice(0, 3).map(r => `${r.subject} (${fmtScore(r.cur)})`).join(', ')}.` : '',
+        blocks.length > 1 ? `Có ${blocks.length} tổ hợp xét tuyển dùng được (${blocks.slice(0, 4).join(', ')}) – nhiều lựa chọn ngành.` : '',
+    ].filter(Boolean);
+
+    const improvements = [
+        ...gaps.slice(0, 3).map(g => `Môn **${g.subject}**: ${fmtScore(g.cur)} → ${fmtScore(g.tgt)}, cần tăng ${fmtScore(g.gap)} điểm.`),
+        !withScore.length ? 'Chưa nhập điểm các môn – nên cập nhật để biết mình đang cách mục tiêu bao xa.' : '',
+        !major ? 'Chưa xác định ngành mong muốn – hãy chọn 2–3 ngành để tìm hiểu kỹ.' : '',
+    ].filter(Boolean);
 
     return {
-        hollandCode: top.map(t => t[0]).join(''),
-        summary: top.length
-            ? `Bạn nổi trội ở nhóm **${top.map(([k]) => HOLLAND_INFO[k][0]).join(', ')}**. Tổ hợp bạn dùng được: ${blocks.join(', ') || 'chưa xác định'}.`
+        hollandCode: codes.join(''),
+        summary: codes.length
+            ? `Bạn nổi trội ở nhóm **${groupNames.join(', ')}** (mã ${codes.join('')}).` +
+              (avg !== null ? ` Điểm hiện tại trung bình khoảng ${fmtScore(Math.round(avg * 10) / 10)}.` : '') +
+              (blocks.length ? ` Tổ hợp dùng được: ${blocks.slice(0, 5).join(', ')}.` : '')
             : 'Kết quả Holland chưa thể hiện rõ nhóm nổi trội. Bạn có thể làm lại bài test hoặc trao đổi với giáo viên.',
-        strengths: top.map(([k]) => `${HOLLAND_INFO[k][0]}: ${HOLLAND_INFO[k][1]}.`),
-        improvements: gaps.slice(0, 3).map(g => `Môn ${g.subject}: cần tăng thêm khoảng ${fmtScore(g.gap)} điểm để đạt mục tiêu.`),
-        subjectPlan: gaps.map(g => ({ subject: g.subject, advice: 'Ôn lại kiến thức nền, luyện đề định kỳ và chữa kỹ lỗi sai.' })),
-        hollandAnalysis: top.length ? `Các nhóm nổi bật của bạn gợi ý những công việc phù hợp với sở thích: ${top.map(([k]) => HOLLAND_INFO[k][1]).join('; ')}.` : '',
-        aspiration: university || major
+        strengths,
+        improvements,
+        scoreOverview: gaps.length
+            ? `Bạn cần cải thiện nhiều nhất ở ${gaps.slice(0, 2).map(g => g.subject).join(' và ')}; các môn còn lại giữ nhịp ôn tập đều.`
+            : withScore.length ? 'Điểm hiện tại đã sát hoặc đạt mục tiêu – tập trung giữ phong độ.' : '',
+        subjectPlan: subjectRows.map(r => ({ subject: r.subject, advice: subjectTip(r.subject, r.cur, r.gap) })),
+        hollandAnalysis: codes.length
+            ? `Với nhóm ${groupNames.join(', ')}, bạn phù hợp môi trường mà ở đó bạn được ${codes.slice(0, 3).map(k => HOLLAND_INFO[k][1]).join('; ')}.`
+            : '',
+        aspiration: aspComment
             ? {
-                comment: 'Hãy tìm hiểu kỹ chương trình đào tạo, điểm chuẩn các năm gần đây và tổ hợp xét tuyển của nguyện vọng này.',
-                alternatives: arr(alternatives).slice(0, 2).map(m => `${m.name} (cần thêm môn ${arr(m.missingSubjects).join(', ')})`),
+                fit,
+                comment: aspComment,
+                alternatives: [
+                    ...arr(ranked).filter(m => !m.aspirationMatch).slice(0, 2).map(m => m.name),
+                    ...arr(alternatives).slice(0, 1).map(m => `${m.name} (cần thêm môn ${arr(m.missingSubjects).join(', ')})`),
+                ].slice(0, 3),
             }
             : {},
         majors: arr(ranked).slice(0, 6).map(m => ({
@@ -195,12 +348,10 @@ function buildRuleBasedAdvice({ scores, ranked = [], alternatives = [], usableBl
             reason: reason(m),
             blocks: [m.academic?.block, ...arr(m.academic?.otherBlocks)].filter(Boolean).slice(0, 3),
         })),
-        admissionMethods: [
-            'Xét điểm thi tốt nghiệp THPT theo tổ hợp đã chọn.',
-            'Xét học bạ (điểm trung bình các năm THPT) nếu trường có áp dụng.',
-            'Kỳ thi Đánh giá năng lực của ĐHQG-HCM.',
-        ],
-        message: 'Hãy kiên trì từng bước nhỏ mỗi ngày – định hướng rõ ràng sẽ giúp bạn đi xa hơn.',
+        admissionMethods: methods,
+        skills: codes.slice(0, 3).map(k => GROUP_SKILLS[k]),
+        roadmap: roadmapFor(gradeOf(studentClass)),
+        message: GROUP_MESSAGE[codes[0]] || 'Hãy kiên trì từng bước nhỏ mỗi ngày – định hướng rõ ràng sẽ giúp bạn đi xa hơn.',
     };
 }
 

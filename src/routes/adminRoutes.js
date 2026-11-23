@@ -9,6 +9,7 @@ const questionCtrl = require('../controllers/questionController');
 
 router.get('/stats', getStats);
 router.get('/stats/detailed', getDetailedStats);
+router.post('/students/:id/regenerate-advice', require('../controllers/resultController').regenerateAdvice);
 router.get('/ai-status', async (_, res) => res.json({ success: true, data: await require('../helpers/aiHelper').getAiStatus() }));
 
 /* ======== Trường & ngành mong muốn (Option) CRUD ======== */

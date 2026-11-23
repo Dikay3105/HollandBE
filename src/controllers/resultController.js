@@ -1,5 +1,5 @@
 // src/controllers/resultController.js
-const { generateFullAdvice } = require('../helpers/aiHelper');
+const { generateFullAdvice, getAiStatus } = require('../helpers/aiHelper');
 const Student = require('../models/Student');
 const crypto = require('crypto');
 const { broadcast, sendTo } = require('../realtime');
@@ -239,4 +239,52 @@ exports.resumePendingAdvice = async () => {
     } catch (err) {
         console.error('resumePendingAdvice lỗi:', err.message);
     }
+};
+
+
+/* ================= Viết lại lời khuyên mẫu bằng AI ================= */
+
+const ADVICE_FIELDS = 'scores recommendedMajors alternativeMajors selectedBlocks electiveSubjects aptitudeSubjects hollandScores hollandCode class university major';
+
+/** Đặt học sinh về trạng thái "AI đang viết" rồi viết lại ở nền */
+async function queueRegenerate(student, catalog) {
+    const jobId = crypto.randomUUID();
+    await Student.updateOne({ _id: student._id }, { $set: { adviceStatus: 'pending', adviceJobId: jobId } });
+    broadcast('student:advice', { id: String(student._id), advice: '', adviceStatus: 'pending' });
+    return generateAdviceInBackground(student._id, jobId, adviceInput(catalog, student));
+}
+
+/**
+ * Chạy định kỳ: học sinh nhận lời khuyên mẫu (AI hết quota / lỗi lúc nộp bài) sẽ được AI viết lại
+ * khi có key dùng được. Mỗi lượt tối đa `limit` em, mới nộp trước; dừng ngay nếu AI vẫn không dùng được.
+ */
+exports.retryFallbackAdvice = async ({ limit = 5 } = {}) => {
+    try {
+        const status = await getAiStatus();
+        if (!status.availableKeys) return;
+        const list = await Student.find({ adviceStatus: 'fallback' }).sort({ createdAt: -1 }).limit(limit).select(ADVICE_FIELDS).lean();
+        if (!list.length) return;
+        console.log(`Thử viết lại bằng AI cho ${list.length} lời khuyên mẫu`);
+        const catalog = await catalogService.load();
+        for (const s of list) {
+            await queueRegenerate(s, catalog);
+            const after = await Student.findById(s._id).select('adviceStatus').lean();
+            if (after?.adviceStatus !== 'done') break; // AI vẫn chưa dùng được → để lượt sau
+        }
+    } catch (err) {
+        console.error('retryFallbackAdvice lỗi:', err.message);
+    }
+};
+
+// POST /api/admin/students/:id/regenerate-advice → admin bấm "Tạo lại lời khuyên AI"
+exports.regenerateAdvice = async (req, res) => {
+    const student = await Student.findById(req.params.id).select(ADVICE_FIELDS).lean();
+    if (!student) return res.status(404).json({ success: false, message: 'Không tìm thấy học sinh' });
+    const status = await getAiStatus();
+    if (!status.availableKeys) {
+        return res.status(503).json({ success: false, message: 'AI đang hết lượt dùng trong ngày (quota sẽ reset lúc 7h sáng). Hệ thống sẽ tự viết lại khi có lượt.' });
+    }
+    const catalog = await catalogService.load();
+    res.status(202).json({ success: true, message: 'Đang tạo lại lời khuyên bằng AI' });
+    queueRegenerate(student, catalog).catch(err => console.error('regenerateAdvice lỗi:', err.message));
 };
