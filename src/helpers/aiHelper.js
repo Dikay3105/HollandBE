@@ -368,7 +368,7 @@ Hôm nay: ${today}. Kỳ thi tốt nghiệp THPT gần nhất: khoảng tháng 6
 
 Học sinh:
 - Lớp ${studentClass || '?'}${grade ? ` (khối ${grade}${grade === 12 ? ', cuối cấp' : ''})` : ''}
-- Holland: ${holland}${hollandCode ? ` → nhóm nổi trội ${hollandCode}` : ''}
+- Holland: ${holland}${hollandCode ? ` → nhóm nổi trội ${hollandCode}` : ' → KHÔNG có nhóm nổi trội (điểm các nhóm ngang nhau / quá thấp)'}
 - Môn thi tự chọn: ${electiveSubjects.join(', ') || 'chưa chọn'}${aptitudeSubjects.length ? `; thi năng khiếu: ${aptitudeSubjects.join(', ')}` : ''}
 - Tổ hợp dùng được: ${blocksText}
 - Điểm (hiện tại → mục tiêu, thang 10): ${scoreLines}
@@ -379,7 +379,7 @@ ${ranked.slice(0, 10).map(rankedLine).join('\n') || 'chưa có'}
 ${alternatives.length ? `Hợp tính cách nhưng chưa có tổ hợp (cần đổi môn/thi năng khiếu): ${alternatives.map(m => `${m.name} (thiếu ${(m.missingSubjects || []).join(', ')})`).join('; ')}` : ''}
 
 Yêu cầu: tiếng Việt có dấu, thân thiện, xưng "bạn", cụ thể cho học sinh THPT ở ${region}, NGẮN GỌN (mỗi ý ≤ 1-2 câu).
-"chưa nhập" = học sinh chưa điền điểm, KHÔNG nhận xét là điểm 0. ${scores.length ? `"subjectPlan": BẮT BUỘC đủ ${scores.length} môn, mỗi môn 1 mục, giữ đúng tên: ${scores.map(s => s.subject).join(', ')}. ` : ''}${majorRule} "reason" phải dựa trên số liệu ở trên (nhóm Holland, điểm tổ hợp). "roadmap": 3 mốc tính từ hôm nay. Được dùng **đậm**, không dùng HTML.
+"chưa nhập" = học sinh chưa điền điểm, KHÔNG nhận xét là điểm 0. ${scores.length ? `"subjectPlan": BẮT BUỘC đủ ${scores.length} môn, mỗi môn 1 mục, giữ đúng tên: ${scores.map(s => s.subject).join(', ')}. ` : ''}${majorRule} "reason" phải dựa trên số liệu ở trên (nhóm Holland, điểm tổ hợp). "roadmap": 3 mốc tính từ hôm nay. Được dùng **đậm**, không dùng HTML.${hollandCode ? '' : ' Học sinh KHÔNG có nhóm Holland nổi trội: "hollandCode" để chuỗi rỗng, TUYỆT ĐỐI không tự đặt mã (VD AEC); "hollandAnalysis" nói rõ hồ sơ cân bằng/chưa rõ xu hướng, gợi ý làm lại test cẩn thận hoặc trao đổi giáo viên; chọn ngành dựa vào nguyện vọng và điểm tổ hợp.'}
 CHỈ trả về MỘT object JSON đúng cấu trúc:
 ${jsonSchema(region, allowExternal ? 'list | ai' : 'list')}`;
 }
