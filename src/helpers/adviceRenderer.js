@@ -72,7 +72,14 @@ ${improvements ? `<div class="adv-card"><h4>Cần cải thiện</h4>${improvemen
 
     // --- Kế hoạch điểm số (số liệu lấy từ dữ liệu thật, AI chỉ viết lời khuyên) ---
     const scores = arr(ctx.scores);
-    const planAdvice = new Map(arr(d.subjectPlan).map(p => [String(p.subject || '').trim().toLowerCase(), p.advice]));
+    // So khớp tên môn linh hoạt: AI hay viết "Hoá học", "Tiếng Anh", "Vật lý"… thay vì "Hóa", "Anh", "Lý"
+    const plans = arr(d.subjectPlan).filter(p => p && p.advice).map(p => ({ key: subjectKey(p.subject), advice: p.advice }));
+    const findPlan = subject => {
+        const key = subjectKey(subject);
+        if (!key) return null;
+        const hit = plans.find(p => p.key === key) || plans.find(p => p.key && (p.key.includes(key) || key.includes(p.key)));
+        return hit ? hit.advice : null;
+    };
     const hasAnyScore = scores.some(s => num(s.currentScore) !== null || num(s.targetScore) !== null);
     if (scores.length) {
         const rows = scores.map(s => {
@@ -80,7 +87,8 @@ ${improvements ? `<div class="adv-card"><h4>Cần cải thiện</h4>${improvemen
             const tgt = num(s.targetScore);
             const gap = cur !== null && tgt !== null ? Math.round((tgt - cur) * 100) / 100 : null;
             const gapHtml = gap === null ? '—' : gap > 0 ? `<span class="adv-up">+${fmtScore(gap)}</span>` : '<span class="adv-ok">Đạt</span>';
-            const advice = planAdvice.get(String(s.subject || '').trim().toLowerCase());
+            // AI bỏ sót môn → điền mẹo theo môn (cùng bộ mẹo của lời khuyên mẫu); khi đang stream thì chờ AI viết tiếp
+            const advice = findPlan(s.subject) || (ctx.streaming ? null : subjectTip(s.subject, cur, gap ?? 0));
             return `<tr><td class="adv-subj">${esc(s.subject)}</td><td>${fmtScore(cur)}</td><td>${fmtScore(tgt)}</td><td>${gapHtml}</td><td class="adv-tip">${advice ? txt(advice) : ''}</td></tr>`;
         }).join('');
         parts.push(section(next(), 'Kế hoạch cải thiện điểm số', `
@@ -166,6 +174,18 @@ ${arr(m.universities).length ? `<div class="adv-unis"><span class="adv-muted">Tr
 // tổ hợp/môn năng khiếu, nguyện vọng, lớp đang học.
 
 const plainVi = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+
+// Tên môn → khoá chuẩn để so khớp ("Hoá học"/"Hóa" → "hoa", "Tiếng Anh"/"Anh văn"/"Ngoại ngữ" → "anh"…)
+const SUBJECT_ALIASES = {
+    'toan hoc': 'toan', 'ngu van': 'van', 'van hoc': 'van', 'tieng anh': 'anh', 'anh van': 'anh', 'ngoai ngu': 'anh', 'english': 'anh',
+    'vat ly': 'ly', 'vat li': 'ly', 'li': 'ly', 'hoa hoc': 'hoa', 'sinh hoc': 'sinh', 'lich su': 'su', 'dia ly': 'dia', 'dia li': 'dia',
+    'tin hoc': 'tin', 'gdcd': 'gdkt pl', 'giao duc cong dan': 'gdkt pl', 'giao duc kinh te va phap luat': 'gdkt pl', 'gd kinh te phap luat': 'gdkt pl',
+    'gdkt pl': 'gdkt pl', 'kinh te phap luat': 'gdkt pl', 'cong nghe': 'cong nghe',
+};
+function subjectKey(name) {
+    const k = plainVi(name).replace(/&/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/^mon /, '');
+    return SUBJECT_ALIASES[k] || k;
+}
 
 // Mẹo theo môn: [cơ bản – khi cần tăng nhiều, nâng cao – khi gần đạt]
 const SUBJECT_TIPS = [

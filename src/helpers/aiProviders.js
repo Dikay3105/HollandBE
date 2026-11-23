@@ -3,13 +3,13 @@
 // Thêm key vào .env là dùng được; nhà cung cấp chưa có key tự bị bỏ qua.
 //
 // Thứ tự thử mặc định (đổi bằng AI_PROVIDERS="gemini,groq,..." trong .env):
-//   Gemini → Groq → Cerebras → OpenRouter → Mistral → Cloudflare → custom
+//   Gemini → Groq → OpenRouter → Z.ai (GLM) → Cloudflare → custom
 // (GitHub Models đã bị GitHub ngừng hoàn toàn từ 30/07/2026 nên không còn trong danh sách)
 // Mỗi nhà cung cấp có thể có nhiều key: <TÊN>_API_KEY, <TÊN>_API_KEY_2, ... (tự xoay vòng).
 const axios = require('axios');
 
 const MODEL_CACHE_MS = 6 * 60 * 60 * 1000;
-const DEFAULT_ORDER = ['gemini', 'groq', 'cerebras', 'openrouter', 'mistral', 'cloudflare', 'custom'];
+const DEFAULT_ORDER = ['gemini', 'groq', 'openrouter', 'zai', 'cloudflare', 'custom'];
 
 /* ================= Thời điểm reset quota ================= */
 
@@ -62,21 +62,6 @@ const PROVIDERS = {
         dailyScope: 'model',
         dailyReset: () => Date.now() + 60 * 60 * 1000, // Groq tính cửa sổ trượt → thử lại sau 1 giờ
     },
-    cerebras: {
-        label: 'Cerebras',
-        baseURL: () => 'https://api.cerebras.ai/v1',
-        keyEnv: 'CEREBRAS_API_KEY',
-        defaults: ['gpt-oss-120b', 'llama-3.3-70b', 'qwen-3-235b-a22b-instruct-2507'],
-        discover: true,
-        prefer: [/gpt-oss-120b/, /qwen-3-235b/, /llama-3\.3-70b/, /llama-4/, /qwen-3-32b/],
-        exclude: /8b|embed|coder/i,
-        maxModels: 3,
-        json: true,
-        reasoning: { reasoning_effort: 'low' },
-        reasoningOnly: /gpt-oss/,
-        dailyScope: 'model',
-        dailyReset: () => Date.now() + 60 * 60 * 1000,
-    },
     openrouter: {
         label: 'OpenRouter',
         baseURL: () => 'https://openrouter.ai/api/v1',
@@ -90,13 +75,14 @@ const PROVIDERS = {
         dailyScope: 'key', // free-models-per-day tính theo tài khoản
         dailyReset: nextUtcMidnight,
     },
-    mistral: {
-        label: 'Mistral (La Plateforme)',
-        baseURL: () => 'https://api.mistral.ai/v1',
-        keyEnv: 'MISTRAL_API_KEY',
-        defaults: ['mistral-medium-latest', 'mistral-small-latest'],
+    zai: {
+        label: 'Z.ai (GLM)',
+        baseURL: () => 'https://api.z.ai/api/paas/v4',
+        keyEnv: 'ZAI_API_KEY',
+        defaults: ['glm-4.5-flash', 'glm-4.7-flash'], // model "flash" miễn phí; 4.5 ra chữ ngay, 4.7 hay chậm >12s (đo thực tế)
         discover: false,
         json: true,
+        reasoning: { thinking: { type: 'disabled' } }, // GLM mặc định bật suy nghĩ → tắt để ra chữ nhanh
         dailyScope: 'key',
         dailyReset: () => Date.now() + 60 * 60 * 1000,
     },

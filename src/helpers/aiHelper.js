@@ -1,6 +1,6 @@
 // src/helpers/aiHelper.js
 // Sinh lời khuyên hướng nghiệp bằng AI – xoay vòng NHIỀU nhà cung cấp miễn phí (xem aiProviders.js):
-// Gemini → Groq → Cerebras → OpenRouter → Mistral → Cloudflare → custom.
+// Gemini → Groq → OpenRouter → Z.ai → Cloudflare → custom.
 //
 // Tốc độ:
 // - Model quá tải / trả JSON hỏng bị tạm nghỉ (thời gian chờ tăng dần); key/model hết quota ngày bị khoá tới lúc reset.
@@ -200,7 +200,9 @@ async function callModel(cand, apiKey, messages, signal, onText) {
     const extra = providers.requestParams(provider, model);
     const drops = paramDrops.get(id) || new Set();
     if (extra.response_format && !drops.has('json')) params.response_format = extra.response_format;
-    for (const k of ['reasoning', 'reasoning_effort']) if (extra[k] !== undefined && !drops.has('reasoning')) params[k] = extra[k];
+    // Tham số tắt "suy nghĩ" mỗi nơi một kiểu: reasoning (OpenRouter), reasoning_effort (Gemini/Groq), thinking (Z.ai)…
+    const reasoningKeys = Object.keys(extra).filter(k => k !== 'response_format');
+    if (!drops.has('reasoning')) for (const k of reasoningKeys) params[k] = extra[k];
 
     // Watchdog: tự huỷ nếu model im lặng quá lâu (cả trước chữ đầu tiên lẫn giữa chừng)
     const local = new AbortController();
@@ -228,10 +230,9 @@ async function callModel(cand, apiKey, messages, signal, onText) {
             } catch (err) {
                 const msg = `${err.message} ${JSON.stringify(err.error || '')}`;
                 if (err?.status !== 400 || attempt >= 2) throw err;
-                if ((params.reasoning || params.reasoning_effort) && /reason|thinking|effort/i.test(msg)) {
+                if (reasoningKeys.some(k => params[k] !== undefined) && /reason|thinking|effort/i.test(msg)) {
                     drops.add('reasoning');
-                    delete params.reasoning;
-                    delete params.reasoning_effort;
+                    reasoningKeys.forEach(k => delete params[k]);
                 } else if (params.response_format && /response_format|json/i.test(msg)) {
                     drops.add('json');
                     delete params.response_format;
@@ -367,7 +368,7 @@ ${ranked.slice(0, 10).map(rankedLine).join('\n') || 'chưa có'}
 ${alternatives.length ? `Hợp tính cách nhưng chưa có tổ hợp (cần đổi môn/thi năng khiếu): ${alternatives.map(m => `${m.name} (thiếu ${(m.missingSubjects || []).join(', ')})`).join('; ')}` : ''}
 
 Yêu cầu: tiếng Việt có dấu, thân thiện, xưng "bạn", cụ thể cho học sinh THPT ở ${region}, NGẮN GỌN (mỗi ý ≤ 1-2 câu).
-"chưa nhập" = học sinh chưa điền điểm, KHÔNG nhận xét là điểm 0. ${majorRule} "reason" phải dựa trên số liệu ở trên (nhóm Holland, điểm tổ hợp). "roadmap": 3 mốc tính từ hôm nay. Được dùng **đậm**, không dùng HTML.
+"chưa nhập" = học sinh chưa điền điểm, KHÔNG nhận xét là điểm 0. ${scores.length ? `"subjectPlan": BẮT BUỘC đủ ${scores.length} môn, mỗi môn 1 mục, giữ đúng tên: ${scores.map(s => s.subject).join(', ')}. ` : ''}${majorRule} "reason" phải dựa trên số liệu ở trên (nhóm Holland, điểm tổ hợp). "roadmap": 3 mốc tính từ hôm nay. Được dùng **đậm**, không dùng HTML.
 CHỈ trả về MỘT object JSON đúng cấu trúc:
 ${jsonSchema(region, allowExternal ? 'list | ai' : 'list')}`;
 }
