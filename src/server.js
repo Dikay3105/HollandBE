@@ -27,7 +27,7 @@ connectDB().then(async () => {
   resumePendingAdvice(); // chạy nền
   // Lời khuyên mẫu (AI hết quota lúc nộp bài) → tự viết lại bằng AI khi có lượt: mỗi 15 phút tối đa 10 em
   // (dừng ngay nếu AI vẫn chưa dùng được, nên không tốn lượt vô ích)
-  setInterval(() => retryFallbackAdvice({ limit: 10 }), 15 * 60 * 1000);
+  setInterval(() => retryFallbackAdvice({ limit: 30 }), 15 * 60 * 1000); // ~120 bài/giờ, đi sau bài mới nộp (hàng đợi ưu tiên)
 });
 
 // Routes
